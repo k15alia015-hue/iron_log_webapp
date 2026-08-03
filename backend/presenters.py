@@ -25,12 +25,12 @@ from errors import ApiError
 from extensions import db
 from models import CustomExercise, DayExercise, ExerciseNote, ExerciseTimer, TrainingSet
 
-# レストタイマーで選べるレスト秒数（分 1〜5 × 秒 10/20/30/40/50 の組み合わせ）。
-# 0 は「不使用」を表す。
+# レストタイマーで選べるレスト秒数（分 1〜5 × 秒 0/10/20/30/40/50 の組み合わせ）。
+# restSeconds 0 は「不使用」を表す（分は1以上なので選択値と衝突しない）。
 ALLOWED_REST_SECONDS = frozenset(
     minutes * 60 + seconds
     for minutes in range(1, 6)
-    for seconds in (10, 20, 30, 40, 50)
+    for seconds in (0, 10, 20, 30, 40, 50)
 )
 
 
