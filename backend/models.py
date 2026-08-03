@@ -165,33 +165,55 @@ class CustomExercise(_GroupedQueryMixin, db.Model):
         cls.query.filter_by(part=part, exercise=exercise).delete()
 
 
-class ExerciseNote(_ExerciseRefMixin, db.Model):
-    __tablename__ = "exercise_notes"
+class _ExerciseKeyedValueMixin(_ExerciseRefMixin):
+    """exercise をキーに単一の値を1つ持つテーブル共通のCRUD（メモ・タイマーなど）。
 
-    exercise = db.Column(db.String(255), primary_key=True)
-    note = db.Column(db.Text, nullable=False)
+    値カラム名はサブクラスの _value_attr で指定する。
+    _ExerciseRefMixin も継承するので、種目名のリネーム/一括削除にも対応する。
+    """
 
-    # ---------------- クエリ ----------------
+    _value_attr = None  # サブクラスで "note" / "rest_seconds" などを指定する
 
     @classmethod
     def all_as_dict(cls):
-        """種目名 -> メモ の辞書を返す。"""
-        return {row.exercise: row.note for row in cls.query.all()}
+        """種目名 -> 値 の辞書を返す。"""
+        return {row.exercise: getattr(row, cls._value_attr) for row in cls.query.all()}
 
     @classmethod
     def get(cls, exercise):
         return cls.query.filter_by(exercise=exercise).first()
 
     @classmethod
-    def upsert(cls, exercise, note):
-        existing = cls.get(exercise)
-        if existing:
-            existing.note = note
+    def upsert(cls, exercise, value):
+        row = cls.get(exercise)
+        if row:
+            setattr(row, cls._value_attr, value)
         else:
-            db.session.add(cls(exercise=exercise, note=note))
+            row = cls(exercise=exercise)
+            setattr(row, cls._value_attr, value)
+            db.session.add(row)
+        return row
 
     @classmethod
     def delete(cls, exercise):
-        existing = cls.get(exercise)
-        if existing:
-            db.session.delete(existing)
+        row = cls.get(exercise)
+        if row:
+            db.session.delete(row)
+
+
+class ExerciseNote(_ExerciseKeyedValueMixin, db.Model):
+    __tablename__ = "exercise_notes"
+    _value_attr = "note"
+
+    exercise = db.Column(db.String(255), primary_key=True)
+    note = db.Column(db.Text, nullable=False)
+
+
+class ExerciseTimer(_ExerciseKeyedValueMixin, db.Model):
+    """種目ごとのレストタイマー設定（rest_seconds 秒）。行が無い＝不使用。"""
+
+    __tablename__ = "exercise_timers"
+    _value_attr = "rest_seconds"
+
+    exercise = db.Column(db.String(255), primary_key=True)
+    rest_seconds = db.Column(db.Integer, nullable=False)

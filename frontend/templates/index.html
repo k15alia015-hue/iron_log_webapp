@@ -104,6 +104,26 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="timer-backdrop" hidden>
+  <div class="modal modal-timer" role="dialog" aria-modal="true" aria-labelledby="timer-title">
+    <h3 class="timer-title" id="timer-title">レスト時間の設定</h3>
+    <div class="timer-group">
+      <span class="timer-group-label">分</span>
+      <div class="timer-options" id="timer-minutes"></div>
+    </div>
+    <div class="timer-group">
+      <span class="timer-group-label">秒</span>
+      <div class="timer-options" id="timer-seconds"></div>
+    </div>
+    <p class="timer-preview" id="timer-preview"></p>
+    <div class="timer-actions">
+      <button class="timer-btn timer-disable" id="timer-disable">不使用</button>
+      <button class="timer-btn timer-cancel" id="timer-cancel">キャンセル</button>
+      <button class="timer-btn timer-apply" id="timer-apply">設定</button>
+    </div>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='model.js') }}"></script>
 <script src="{{ url_for('static', filename='view.js') }}"></script>
 <script src="{{ url_for('static', filename='presenter.js') }}"></script>

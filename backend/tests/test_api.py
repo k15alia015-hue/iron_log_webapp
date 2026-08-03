@@ -146,6 +146,41 @@ def test_delete_master_exercise_blocked(client):
     assert res.status_code == 400
 
 
+# ---------------- レストタイマー ----------------
+
+def test_timer_save_and_get(client):
+    res = client.post("/api/exercise-timers", json={"exercise": "ベンチプレス", "restSeconds": 150})
+    assert res.status_code == 200
+    assert res.get_json()["restSeconds"] == 150
+    assert client.get("/api/exercise-timers").get_json()["ベンチプレス"] == 150
+
+
+def test_timer_disable_removes_setting(client):
+    client.post("/api/exercise-timers", json={"exercise": "ベンチプレス", "restSeconds": 90})
+    res = client.post("/api/exercise-timers", json={"exercise": "ベンチプレス", "restSeconds": 0})
+    assert res.status_code == 200
+    assert res.get_json()["restSeconds"] == 0
+    assert "ベンチプレス" not in client.get("/api/exercise-timers").get_json()
+
+
+def test_timer_rejects_invalid_value(client):
+    # 分1〜5・秒10〜50の組み合わせ以外は拒否（95秒 = 1分35秒は不正）
+    res = client.post("/api/exercise-timers", json={"exercise": "ベンチプレス", "restSeconds": 95})
+    assert res.status_code == 400
+
+
+def test_timer_carried_and_purged_with_custom_exercise(client):
+    client.post("/api/exercises", json={"part": "胸", "exercise": "自作種目"})
+    client.post("/api/exercise-timers", json={"exercise": "自作種目", "restSeconds": 130})
+    # リネームでタイマー設定が引き継がれる
+    client.patch("/api/exercises/胸/自作種目", json={"newName": "自作種目2"})
+    timers = client.get("/api/exercise-timers").get_json()
+    assert timers.get("自作種目2") == 130 and "自作種目" not in timers
+    # 削除でタイマー設定も消える
+    client.delete("/api/exercises/胸/自作種目2")
+    assert "自作種目2" not in client.get("/api/exercise-timers").get_json()
+
+
 # ---------------- エラーハンドラ ----------------
 
 def test_unknown_route_returns_json_404(client):

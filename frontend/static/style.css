@@ -738,6 +738,102 @@ button { font-family: inherit; }
 }
 .confirm-yes:hover { background: var(--accent); }
 
+/* Timer settings dialog (レスト時間の設定) */
+
+.modal-timer {
+  max-width: 420px;
+  padding: 24px;
+  gap: 18px;
+}
+
+.timer-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.5px;
+}
+
+.timer-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.timer-group-label {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--steel);
+  width: 24px;
+  flex-shrink: 0;
+}
+
+.timer-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timer-option {
+  min-width: 46px;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--chalk);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.timer-option:hover { border-color: var(--steel); }
+.timer-option.is-selected {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+  color: var(--chalk);
+}
+
+.timer-preview {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.timer-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.timer-btn {
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--chalk);
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.timer-cancel:hover { border-color: var(--steel); background: var(--surface-alt); }
+
+.timer-disable {
+  margin-right: auto; /* 「不使用」だけ左寄せにする */
+}
+.timer-disable:hover { border-color: var(--steel); background: var(--surface-alt); }
+
+.timer-apply {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+}
+.timer-apply:hover { background: var(--accent); }
+.timer-apply:disabled { opacity: 0.4; cursor: not-allowed; }
+
 .back-link {
   background: none;
   border: none;
@@ -849,10 +945,74 @@ button { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
+  flex-shrink: 0;
   align-items: flex-end;
   min-width: 0;
 }
+
+/* レストタイマー（種目名とMAX表示の間・中央） */
+.hc-timer {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hc-timer-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--chalk);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.hc-timer-label:hover { border-color: var(--steel); }
+
+.hc-timer.is-off .hc-timer-label {
+  color: var(--muted);
+}
+
+.hc-timer.is-running .hc-timer-label {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+  color: var(--chalk);
+}
+
+.hc-timer.is-done .hc-timer-label {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  animation: timer-flash 0.5s steps(1) 0s 4;
+}
+
+@keyframes timer-flash {
+  50% { opacity: 0.35; }
+}
+
+.hc-timer-toggle {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  color: var(--chalk);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.hc-timer-toggle:hover { border-color: var(--accent-dim); background: var(--accent-soft); }
+.hc-timer.is-running .hc-timer-toggle { border-color: var(--accent-dim); background: var(--accent-soft); }
 
 .hc-best-line {
   font-family: var(--font-mono);

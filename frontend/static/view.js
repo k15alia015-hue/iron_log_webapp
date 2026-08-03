@@ -46,7 +46,27 @@ class IronLogView {
       confirmMessage: document.getElementById("confirm-message"),
       confirmYes: document.getElementById("confirm-yes"),
       confirmNo: document.getElementById("confirm-no"),
+      timerBackdrop: document.getElementById("timer-backdrop"),
+      timerMinutes: document.getElementById("timer-minutes"),
+      timerSeconds: document.getElementById("timer-seconds"),
+      timerPreview: document.getElementById("timer-preview"),
+      timerDisable: document.getElementById("timer-disable"),
+      timerCancel: document.getElementById("timer-cancel"),
+      timerApply: document.getElementById("timer-apply"),
     };
+    this._audioCtx = null; // レスト終了音用（初回のユーザー操作時に生成）
+  }
+
+  // ---------------- 時間表示ユーティリティ ----------------
+
+  static REST_MINUTES = [1, 2, 3, 4, 5];
+  static REST_SECONDS = [10, 20, 30, 40, 50];
+
+  /** 秒数を "m:ss" 形式にする */
+  static formatClock(totalSeconds) {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
   }
 
   // ---------------- 共通ユーティリティ（表示整形のみ） ----------------
@@ -212,7 +232,7 @@ class IronLogView {
     this.el.historyEmpty.hidden = items.length > 0;
     this.setRemoveExerciseDisabled(items.length === 0);
 
-    items.forEach(({ exercise, part, color, sets, bestWeight, bestReps, note, isInputVisible, areActionsHidden }) => {
+    items.forEach(({ exercise, part, color, sets, bestWeight, bestReps, note, isInputVisible, areActionsHidden, restSeconds, timerRunning, timerRemaining }) => {
       const card = document.createElement("div");
       card.className = "history-card";
 
@@ -248,9 +268,17 @@ class IronLogView {
           `
           : "";
 
+      const timerHTML = `
+        <div class="hc-timer" data-timer-exercise="${IronLogView.escapeHTML(exercise)}">
+          <button type="button" class="hc-timer-label" title="レスト時間の設定">⏱ <span class="hc-timer-text"></span></button>
+          <button type="button" class="hc-timer-toggle" title="タイマー開始／停止" hidden>▶</button>
+        </div>
+      `;
+
       card.innerHTML = `
         <div class="hc-header">
           <span class="h-name"><span class="h-part-dot" style="background:${color}"></span>${IronLogView.escapeHTML(exercise)}</span>
+          ${timerHTML}
           ${bestHTML}
           <button class="btn-history-delete" title="この種目を削除">×</button>
         </div>
@@ -314,7 +342,139 @@ class IronLogView {
         handlers.removeLastSet(part, exercise, sets);
       });
 
+      // レストタイマー：ラベルで設定、トグルで開始/停止。初期表示を反映する。
+      const timerBox = card.querySelector(".hc-timer");
+      timerBox.querySelector(".hc-timer-label").addEventListener("click", () => handlers.editTimer(exercise));
+      timerBox.querySelector(".hc-timer-toggle").addEventListener("click", () => handlers.toggleTimer(exercise));
+      this._applyTimerState(timerBox, { restSeconds, running: timerRunning, remaining: timerRemaining });
+
       this.el.historyList.appendChild(card);
+    });
+  }
+
+  // ---------------- レストタイマー表示 ----------------
+
+  /** タイマー1つ分の見た目（ラベル文字・トグル・状態クラス）を反映する */
+  _applyTimerState(container, { restSeconds, running, remaining, done }) {
+    const textEl = container.querySelector(".hc-timer-text");
+    const toggle = container.querySelector(".hc-timer-toggle");
+
+    container.classList.toggle("is-off", !restSeconds);
+    container.classList.toggle("is-running", !!running);
+    container.classList.toggle("is-done", !!done);
+
+    if (!restSeconds) {
+      textEl.textContent = "不使用";
+      toggle.hidden = true;
+      return;
+    }
+    toggle.hidden = false;
+    toggle.textContent = running ? "■" : "▶";
+    if (done) {
+      textEl.textContent = "終了";
+    } else {
+      textEl.textContent = IronLogView.formatClock(running ? remaining : restSeconds);
+    }
+  }
+
+  /** Presenterのカウントダウンから呼ばれ、該当種目のタイマー表示だけを更新する */
+  updateRestTimer(exercise, state) {
+    const container = this.el.historyList.querySelector(
+      `.hc-timer[data-timer-exercise="${CSS.escape(exercise)}"]`
+    );
+    if (container) this._applyTimerState(container, state);
+  }
+
+  /** レスト終了の通知：ビープ音を鳴らし、少し「終了」表示にしてから元の設定値へ戻す */
+  notifyRestDone(exercise, restSeconds) {
+    this._playBeep();
+    setTimeout(() => {
+      this.updateRestTimer(exercise, { restSeconds, running: false });
+    }, 3000);
+  }
+
+  /** レスト終了音を出せるよう、ユーザー操作のタイミングでAudioContextを準備する */
+  primeAudio() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!this._audioCtx) this._audioCtx = new Ctx();
+      if (this._audioCtx.state === "suspended") this._audioCtx.resume();
+    } catch (_e) {
+      /* 音が出せない環境は無視 */
+    }
+  }
+
+  _playBeep() {
+    try {
+      const ctx = this._audioCtx || (this._audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+      const now = ctx.currentTime;
+      [0, 0.25, 0.5].forEach((offset) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 880;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.3, now + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.18);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.2);
+      });
+    } catch (_e) {
+      /* 音が出せない環境は無視 */
+    }
+  }
+
+  /**
+   * レスト時間の設定ポップアップを開く。
+   * 「設定」で選んだ秒数、「不使用」で0、「キャンセル/閉じる」でnullを返すPromise。
+   */
+  openTimerSettings(currentRestSeconds) {
+    let selMin = null;
+    let selSec = null;
+    if (currentRestSeconds > 0) {
+      selMin = Math.floor(currentRestSeconds / 60);
+      selSec = currentRestSeconds % 60;
+    }
+
+    return this._openModal(this.el.timerBackdrop, ({ close, on }) => {
+      const refresh = () => {
+        if (selMin && selSec) {
+          this.el.timerPreview.textContent = `${selMin}分${selSec}秒（${IronLogView.formatClock(selMin * 60 + selSec)}）`;
+          this.el.timerApply.disabled = false;
+        } else {
+          this.el.timerPreview.textContent = "分と秒を選択してください";
+          this.el.timerApply.disabled = true;
+        }
+      };
+
+      const buildOptions = (containerEl, values, getSelected, setSelected) => {
+        containerEl.innerHTML = "";
+        values.forEach((value) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "timer-option";
+          btn.textContent = value;
+          if (getSelected() === value) btn.classList.add("is-selected");
+          btn.addEventListener("click", () => {
+            setSelected(value);
+            containerEl.querySelectorAll(".timer-option").forEach((b) => b.classList.remove("is-selected"));
+            btn.classList.add("is-selected");
+            refresh();
+          });
+          containerEl.appendChild(btn);
+        });
+      };
+
+      buildOptions(this.el.timerMinutes, IronLogView.REST_MINUTES, () => selMin, (v) => { selMin = v; });
+      buildOptions(this.el.timerSeconds, IronLogView.REST_SECONDS, () => selSec, (v) => { selSec = v; });
+      refresh();
+
+      on(this.el.timerApply, "click", () => { if (selMin && selSec) close(selMin * 60 + selSec); });
+      on(this.el.timerDisable, "click", () => close(0));
+      on(this.el.timerCancel, "click", () => close(null));
+      return null; // Escape・背景クリック = キャンセル
     });
   }
 
@@ -492,29 +652,40 @@ class IronLogView {
     return btn;
   }
 
+  /**
+   * モーダル共通処理。背景の表示、Escape・背景クリックでのキャンセル、後片付けをまとめる。
+   * setup({ close, on }) でモーダル固有の中身（ボタン配線など）を組み立て、
+   * Escape・背景クリック時に resolve する値（キャンセル値）を返す。
+   *   close(value) … 明示的に閉じて value で解決する
+   *   on(el, event, handler) … リスナー登録（閉じるとき自動で解除される）
+   */
+  _openModal(backdropEl, setup) {
+    return new Promise((resolve) => {
+      const cleanups = [];
+      const on = (el, event, handler) => {
+        el.addEventListener(event, handler);
+        cleanups.push(() => el.removeEventListener(event, handler));
+      };
+      const close = (value) => {
+        backdropEl.hidden = true;
+        cleanups.forEach((fn) => fn());
+        resolve(value);
+      };
+      backdropEl.hidden = false;
+      const cancelValue = setup({ close, on });
+      on(backdropEl, "click", (e) => { if (e.target === backdropEl) close(cancelValue); });
+      on(document, "keydown", (e) => { if (e.key === "Escape") close(cancelValue); });
+    });
+  }
+
   /** 「本当に削除してよろしいですか？」の確認ダイアログ。はい→true / いいえ→false を返す */
   confirm(message) {
-    return new Promise((resolve) => {
-      this.el.confirmMessage.textContent = message;
-      this.el.confirmBackdrop.hidden = false;
-
-      const cleanup = () => {
-        this.el.confirmBackdrop.hidden = true;
-        this.el.confirmYes.removeEventListener("click", onYes);
-        this.el.confirmNo.removeEventListener("click", onNo);
-        this.el.confirmBackdrop.removeEventListener("click", onBackdrop);
-        document.removeEventListener("keydown", onKey);
-      };
-      const onYes = () => { cleanup(); resolve(true); };
-      const onNo = () => { cleanup(); resolve(false); };
-      const onBackdrop = (e) => { if (e.target === this.el.confirmBackdrop) { cleanup(); resolve(false); } };
-      const onKey = (e) => { if (e.key === "Escape") { cleanup(); resolve(false); } };
-
-      this.el.confirmYes.addEventListener("click", onYes);
-      this.el.confirmNo.addEventListener("click", onNo);
-      this.el.confirmBackdrop.addEventListener("click", onBackdrop);
-      document.addEventListener("keydown", onKey);
+    this.el.confirmMessage.textContent = message;
+    return this._openModal(this.el.confirmBackdrop, ({ close, on }) => {
+      on(this.el.confirmYes, "click", () => close(true));
+      on(this.el.confirmNo, "click", () => close(false));
       this.el.confirmNo.focus();
+      return false; // Escape・背景クリック = いいえ
     });
   }
 

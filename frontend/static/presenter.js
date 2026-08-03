@@ -27,6 +27,7 @@ class IronLogPresenter {
     this.editExercisesMode = false; // 種目選択画面で「種目の編集」モードか
     this.visibleInputs = new Set();       // "日付|種目" → 新規セット入力欄を表示中
     this.hiddenActionButtons = new Set(); // "日付|種目" → 削除/追加ボタンを非表示中
+    this.restTimers = {};                 // 種目名 → { remaining, intervalId }（走行中のレストタイマー）
   }
 
   async init() {
@@ -130,6 +131,7 @@ class IronLogPresenter {
     const items = list.map(({ exercise, part }) => {
       const sets = this.model.setsForExerciseOnDate(exercise, this.selectedDate);
       const inputKey = `${this.selectedDate}|${exercise}`;
+      const runningTimer = this.restTimers[exercise];
       return {
         exercise,
         part,
@@ -140,6 +142,9 @@ class IronLogPresenter {
         note: this.model.getNote(exercise),
         isInputVisible: this.visibleInputs.has(inputKey),
         areActionsHidden: this.hiddenActionButtons.has(inputKey),
+        restSeconds: this.model.getTimer(exercise),
+        timerRunning: !!runningTimer,
+        timerRemaining: runningTimer ? runningTimer.remaining : undefined,
       };
     });
 
@@ -166,7 +171,60 @@ class IronLogPresenter {
         const lastSet = sets[sets.length - 1];
         this.deleteSetInline(part, exercise, lastSet._idx);
       },
+      editTimer: (exercise) => this.editTimer(exercise),
+      toggleTimer: (exercise) => this.toggleTimer(exercise),
     });
+  }
+
+  // ---------------- レストタイマー ----------------
+
+  async editTimer(exercise) {
+    const chosen = await this.view.openTimerSettings(this.model.getTimer(exercise));
+    if (chosen === null) return; // キャンセル
+    await this._runAction(async () => {
+      await this.model.saveTimer(exercise, chosen);
+      if (chosen === 0) this._stopTimer(exercise); // 不使用にしたら走行中タイマーも止める
+      this.renderHistory();
+    });
+  }
+
+  toggleTimer(exercise) {
+    if (this.restTimers[exercise]) {
+      this._stopTimer(exercise);
+      this.view.updateRestTimer(exercise, { restSeconds: this.model.getTimer(exercise), running: false });
+      return;
+    }
+    const restSeconds = this.model.getTimer(exercise);
+    if (!restSeconds) return; // 不使用
+    this.view.primeAudio(); // 終了音を鳴らせるようにする（ユーザー操作のうちに準備）
+    this._startTimer(exercise, restSeconds);
+  }
+
+  _startTimer(exercise, restSeconds) {
+    this._stopTimer(exercise);
+    const state = { remaining: restSeconds, intervalId: null };
+    this.restTimers[exercise] = state;
+    this.view.updateRestTimer(exercise, { restSeconds, running: true, remaining: restSeconds });
+
+    state.intervalId = setInterval(() => {
+      state.remaining -= 1;
+      if (state.remaining <= 0) {
+        clearInterval(state.intervalId);
+        delete this.restTimers[exercise];
+        this.view.updateRestTimer(exercise, { restSeconds, running: false, done: true });
+        this.view.notifyRestDone(exercise, restSeconds);
+      } else {
+        this.view.updateRestTimer(exercise, { restSeconds, running: true, remaining: state.remaining });
+      }
+    }, 1000);
+  }
+
+  _stopTimer(exercise) {
+    const state = this.restTimers[exercise];
+    if (state) {
+      clearInterval(state.intervalId);
+      delete this.restTimers[exercise];
+    }
   }
 
   /** Modelの更新系メソッド呼び出し＋失敗時のアラート表示、という繰り返しパターンの共通処理 */
