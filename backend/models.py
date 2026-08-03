@@ -16,7 +16,18 @@ Presenterからはこのモジュールの関数・メソッドを呼ぶだけ�
 from extensions import db
 
 
-class TrainingSet(db.Model):
+class _GroupedQueryMixin:
+    """追加順の全件取得を、指定したキーでグルーピングして返す共通処理。"""
+
+    @classmethod
+    def _all_grouped_by(cls, key_func):
+        data = {}
+        for row in cls.query.order_by(cls.id).all():
+            data.setdefault(key_func(row), []).append(row.to_dict())
+        return data
+
+
+class TrainingSet(_GroupedQueryMixin, db.Model):
     __tablename__ = "training_sets"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -33,10 +44,7 @@ class TrainingSet(db.Model):
     @classmethod
     def all_grouped_by_exercise(cls):
         """種目名 -> セット一覧（追加順）の辞書を返す。"""
-        data = {}
-        for row in cls.query.order_by(cls.id).all():
-            data.setdefault(row.exercise, []).append(row.to_dict())
-        return data
+        return cls._all_grouped_by(lambda row: row.exercise)
 
     @classmethod
     def for_exercise(cls, exercise):
@@ -54,7 +62,7 @@ class TrainingSet(db.Model):
         cls.query.filter_by(exercise=exercise, set_date=set_date).delete()
 
 
-class DayExercise(db.Model):
+class DayExercise(_GroupedQueryMixin, db.Model):
     __tablename__ = "day_exercises"
     __table_args__ = (db.UniqueConstraint("day", "part", "exercise", name="uq_day_part_exercise"),)
 
@@ -71,10 +79,7 @@ class DayExercise(db.Model):
     @classmethod
     def all_grouped_by_day(cls):
         """日付(ISO文字列) -> 種目一覧（追加順）の辞書を返す。"""
-        data = {}
-        for row in cls.query.order_by(cls.id).all():
-            data.setdefault(row.day.isoformat(), []).append(row.to_dict())
-        return data
+        return cls._all_grouped_by(lambda row: row.day.isoformat())
 
     @classmethod
     def for_day(cls, day_value):

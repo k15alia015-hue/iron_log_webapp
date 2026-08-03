@@ -31,6 +31,12 @@ import presenters
 bp = Blueprint("views", __name__)
 
 
+def _respond(result):
+    """Presenter関数の戻り値 (data, status) をJSONレスポンスに変換する共通処理。"""
+    data, status = result
+    return jsonify(data), status
+
+
 @bp.route("/")
 def index():
     return render_template("index.html")
@@ -38,56 +44,47 @@ def index():
 
 @bp.route("/api/body-parts", methods=["GET"])
 def body_parts():
-    data, status = presenters.get_body_parts()
-    return jsonify(data), status
+    return _respond(presenters.get_body_parts())
 
 
 @bp.route("/api/sets", methods=["GET"])
 def list_sets():
-    data, status = presenters.get_sets()
-    return jsonify(data), status
+    return _respond(presenters.get_sets())
 
 
 @bp.route("/api/sets", methods=["POST"])
 def create_set():
     payload = request.get_json(silent=True) or {}
-    data, status = presenters.add_set(payload)
-    return jsonify(data), status
+    return _respond(presenters.add_set(payload))
 
 
 @bp.route("/api/sets/<exercise>/<int:index>", methods=["DELETE"])
 def remove_set(exercise, index):
-    data, status = presenters.delete_set(exercise, index)
-    return jsonify(data), status
+    return _respond(presenters.delete_set(exercise, index))
 
 
 @bp.route("/api/day-exercises", methods=["GET"])
 def list_day_exercises():
-    data, status = presenters.get_day_exercises()
-    return jsonify(data), status
+    return _respond(presenters.get_day_exercises())
 
 
 @bp.route("/api/day-exercises", methods=["POST"])
 def create_day_exercise():
     payload = request.get_json(silent=True) or {}
-    data, status = presenters.add_day_exercise(payload)
-    return jsonify(data), status
+    return _respond(presenters.add_day_exercise(payload))
 
 
 @bp.route("/api/day-exercises/<day>/<part>/<exercise>", methods=["DELETE"])
 def remove_day_exercise(day, part, exercise):
-    data, status = presenters.delete_day_exercise(day, part, exercise)
-    return jsonify(data), status
+    return _respond(presenters.delete_day_exercise(day, part, exercise))
 
 
 @bp.route("/api/exercise-notes", methods=["GET"])
 def list_exercise_notes():
-    data, status = presenters.get_exercise_notes()
-    return jsonify(data), status
+    return _respond(presenters.get_exercise_notes())
 
 
 @bp.route("/api/exercise-notes", methods=["POST"])
 def create_exercise_note():
     payload = request.get_json(silent=True) or {}
-    data, status = presenters.save_exercise_note(payload)
-    return jsonify(data), status
+    return _respond(presenters.save_exercise_note(payload))

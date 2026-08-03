@@ -167,12 +167,23 @@ class IronLogPresenter {
     });
   }
 
-  async saveNote(exercise, note) {
+  /** Modelの更新系メソッド呼び出し＋失敗時のアラート表示、という繰り返しパターンの共通処理 */
+  async _runAction(action) {
     try {
-      await this.model.saveNote(exercise, note);
+      await action();
     } catch (err) {
       window.alert(err.message);
     }
+  }
+
+  /** セット・種目の増減があった後、カレンダーと履歴を両方再描画する */
+  _refreshCalendarAndHistory() {
+    this.renderHistory();
+    this.renderCalendar();
+  }
+
+  async saveNote(exercise, note) {
+    await this._runAction(() => this.model.saveNote(exercise, note));
   }
 
   async addSetInline(part, exercise, weightRaw, repsRaw, checkbox, errorEl) {
@@ -197,8 +208,7 @@ class IronLogPresenter {
     try {
       await this.model.addSet(exercise, weight, reps, this.selectedDate);
       this.visibleInputs.delete(`${this.selectedDate}|${exercise}`);
-      this.renderHistory();
-      this.renderCalendar();
+      this._refreshCalendarAndHistory();
     } catch (err) {
       errorEl.textContent = err.message;
       errorEl.hidden = false;
@@ -207,34 +217,26 @@ class IronLogPresenter {
   }
 
   async deleteSetInline(part, exercise, index) {
-    try {
+    await this._runAction(async () => {
       await this.model.deleteSet(exercise, index);
-      this.renderHistory();
-      this.renderCalendar();
-    } catch (err) {
-      window.alert(err.message);
-    }
+      this._refreshCalendarAndHistory();
+    });
   }
 
   async addDayExercise(part, exercise) {
-    try {
+    await this._runAction(async () => {
       await this.model.addDayExercise(this.selectedDate, part, exercise);
       this.renderHistory();
       this.showView("history");
-    } catch (err) {
-      window.alert(err.message);
-    }
+    });
   }
 
   async removeDayExercise(part, exercise) {
-    try {
+    await this._runAction(async () => {
       await this.model.removeDayExercise(this.selectedDate, part, exercise);
-      this.renderHistory();
-      this.renderCalendar();
+      this._refreshCalendarAndHistory();
       this.showView("history");
-    } catch (err) {
-      window.alert(err.message);
-    }
+    });
   }
 
   // ---------------- 種目選択（追加 / 削除モード） ----------------

@@ -23,6 +23,16 @@ from config import BODY_PARTS
 from extensions import db
 from models import DayExercise, ExerciseNote, TrainingSet
 
+DATE_FORMAT_ERROR = {"error": "dateはYYYY-MM-DD形式で指定してください"}, 400
+
+
+def _parse_date(date_str):
+    """YYYY-MM-DD形式の文字列をdateに変換する。不正な場合はNoneを返す。"""
+    try:
+        return date.fromisoformat(date_str)
+    except (TypeError, ValueError):
+        return None
+
 
 def get_body_parts():
     return BODY_PARTS, 200
@@ -52,10 +62,9 @@ def add_set(payload):
         return {"error": "weightは数値、repsは1以上の整数で指定してください"}, 400
 
     if set_date:
-        try:
-            set_date = date.fromisoformat(set_date)
-        except ValueError:
-            return {"error": "dateはYYYY-MM-DD形式で指定してください"}, 400
+        set_date = _parse_date(set_date)
+        if set_date is None:
+            return DATE_FORMAT_ERROR
     else:
         set_date = date.today()
 
@@ -94,10 +103,9 @@ def add_day_exercise(payload):
     if not day or not part or not exercise:
         return {"error": "date, part, exercise は必須です"}, 400
 
-    try:
-        day_value = date.fromisoformat(day)
-    except ValueError:
-        return {"error": "dateはYYYY-MM-DD形式で指定してください"}, 400
+    day_value = _parse_date(day)
+    if day_value is None:
+        return DATE_FORMAT_ERROR
 
     if part not in BODY_PARTS or exercise not in BODY_PARTS[part]:
         return {"error": "指定された部位・種目の組み合わせが正しくありません"}, 400
@@ -111,10 +119,9 @@ def add_day_exercise(payload):
 
 
 def delete_day_exercise(day, part, exercise):
-    try:
-        day_value = date.fromisoformat(day)
-    except ValueError:
-        return {"error": "dateはYYYY-MM-DD形式で指定してください"}, 400
+    day_value = _parse_date(day)
+    if day_value is None:
+        return DATE_FORMAT_ERROR
 
     DayExercise.delete(day_value, part, exercise)
 
