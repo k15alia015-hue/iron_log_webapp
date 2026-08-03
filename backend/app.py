@@ -10,15 +10,24 @@ DB接続(extensions.py)・設定(config.py)・認証(auth.py)を組み立てて
 ===================================================================
 """
 
+import os
+
 import config
 from auth import register_auth
 from extensions import db
 from flask import Flask
 from views import bp as views_bp
 
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(BACKEND_DIR, "..", "frontend")
+
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(FRONTEND_DIR, "templates"),
+        static_folder=os.path.join(FRONTEND_DIR, "static"),
+    )
     app.config["SQLALCHEMY_DATABASE_URI"] = config.SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 

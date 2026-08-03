@@ -16,10 +16,11 @@ from app import app
 from extensions import db
 from models import DayExercise, ExerciseNote, TrainingSet
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_FILE = os.path.join(BASE_DIR, "training_data.json")
-DAY_EXERCISES_FILE = os.path.join(BASE_DIR, "day_exercises.json")
-NOTES_FILE = os.path.join(BASE_DIR, "exercise_notes.json")
+# 移行元のJSONファイルはプロジェクトルート(backend/の一つ上)にある
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_FILE = os.path.join(ROOT_DIR, "training_data.json")
+DAY_EXERCISES_FILE = os.path.join(ROOT_DIR, "day_exercises.json")
+NOTES_FILE = os.path.join(ROOT_DIR, "exercise_notes.json")
 
 
 def load_json(path):
