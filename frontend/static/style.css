@@ -958,14 +958,29 @@ button { font-family: inherit; }
   flex-shrink: 0; /* タイマー・MAX・削除はまとめて右側に固定 */
 }
 
+/* ラベル｜○○kg｜○○回 の3列。ラベルは左寄せ（タイマー横）、値2列は均等幅。
+   記録の有無や桁数に関わらず各列の位置が揃うよう、固定幅の領域にする。 */
 .hc-best {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: baseline;
   flex-shrink: 0;
-  align-items: flex-end;
-  /* 記録の有無や桁数に関わらず一定幅を確保し、タイマー領域と分離する */
-  width: 170px;
+  width: 210px;
+}
+
+.hc-best-line {
+  display: contents; /* 各行の label/kg/回 を直接グリッドのセルにして、2行で列を揃える */
+}
+
+.hc-best-weight,
+.hc-best-reps {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: var(--muted);
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* レストタイマー（MAX表示の左隣・固定幅の独立領域） */
@@ -1047,18 +1062,12 @@ button { font-family: inherit; }
 .hc-timer-toggle:hover { border-color: var(--accent-dim); background: var(--accent-soft); }
 .hc-timer.is-running .hc-timer-toggle { border-color: var(--accent-dim); background: var(--accent-soft); }
 
-.hc-best-line {
-  font-family: var(--font-mono);
-  font-size: 18px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
 .hc-best-label {
   font-family: var(--font-body);
   font-size: 12px;
   color: var(--steel);
-  margin-right: 6px;
+  text-align: left; /* ラベルはタイマー側（左）に寄せる */
+  white-space: nowrap;
 }
 
 .hc-best-line-max .hc-best-label {

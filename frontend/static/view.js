@@ -258,14 +258,24 @@ class IronLogView {
         </div>
       `;
 
-      // MAX重量／MAX回数は記録が無くても常に表示し、値が無い部分はダッシュで示す
-      const MAX_PLACEHOLDER = "ーーーkg ーー回";
-      const maxWeightText = bestWeight ? `${bestWeight.weight}kg ${bestWeight.reps}回` : MAX_PLACEHOLDER;
-      const maxRepsText = bestReps ? `${bestReps.weight}kg ${bestReps.reps}回` : MAX_PLACEHOLDER;
+      // MAX重量／MAX回数は記録が無くても常に表示。値は「kg」「回」を別々の列に分け、
+      // 記録が無い部分はダッシュで示す（列で領域を分けるので位置は常に揃う）。
+      const maxWeightKg = bestWeight ? `${bestWeight.weight}kg` : "ーーーkg";
+      const maxWeightReps = bestWeight ? `${bestWeight.reps}回` : "ーー回";
+      const maxRepsKg = bestReps ? `${bestReps.weight}kg` : "ーーーkg";
+      const maxRepsReps = bestReps ? `${bestReps.reps}回` : "ーー回";
       const bestHTML = `
         <div class="hc-best">
-          <span class="hc-best-line hc-best-line-max"><span class="hc-best-label">MAX重量</span>${maxWeightText}</span>
-          <span class="hc-best-line"><span class="hc-best-label">MAX回数</span>${maxRepsText}</span>
+          <span class="hc-best-line hc-best-line-max">
+            <span class="hc-best-label">MAX重量</span>
+            <span class="hc-best-weight">${maxWeightKg}</span>
+            <span class="hc-best-reps">${maxWeightReps}</span>
+          </span>
+          <span class="hc-best-line">
+            <span class="hc-best-label">MAX回数</span>
+            <span class="hc-best-weight">${maxRepsKg}</span>
+            <span class="hc-best-reps">${maxRepsReps}</span>
+          </span>
         </div>`;
 
       const timerHTML = `
