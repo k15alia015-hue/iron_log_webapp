@@ -25,6 +25,7 @@ from extensions import db
 from models import CustomExercise, DayExercise, ExerciseNote, TrainingSet
 
 DATE_FORMAT_ERROR = {"error": "dateはYYYY-MM-DD形式で指定してください"}, 400
+NAME_REQUIRED_ERROR = {"error": "種目名を入力してください"}, 400
 
 
 def _parse_date(date_str):
@@ -66,6 +67,16 @@ def _validate_custom_exercise(part, exercise):
     return None
 
 
+def _duplicate_name_error(part, name):
+    """指定した種目名がその部位に既に存在すれば409エラー、なければNoneを返す。
+
+    初期マスタ・ユーザー追加分のどちらかにあれば重複として扱う。
+    """
+    if name in _effective_body_parts()[part]:
+        return {"error": "その種目はすでに存在します"}, 409
+    return None
+
+
 def get_body_parts():
     return _effective_body_parts(), 200
 
@@ -83,14 +94,14 @@ def add_exercise(payload):
 
     exercise = exercise.strip()
     if not exercise:
-        return {"error": "種目名を入力してください"}, 400
+        return NAME_REQUIRED_ERROR
 
     if part not in BODY_PARTS:
         return {"error": "指定された部位が正しくありません"}, 400
 
-    # 初期マスタ・ユーザー追加分のどちらかに既にあれば重複として扱う
-    if exercise in _effective_body_parts()[part]:
-        return {"error": "その種目はすでに存在します"}, 409
+    duplicate = _duplicate_name_error(part, exercise)
+    if duplicate:
+        return duplicate
 
     CustomExercise.create(part, exercise)
     db.session.commit()
@@ -101,7 +112,7 @@ def add_exercise(payload):
 def rename_exercise(part, old_name, payload):
     new_name = (payload.get("newName") or "").strip()
     if not new_name:
-        return {"error": "種目名を入力してください"}, 400
+        return NAME_REQUIRED_ERROR
 
     error = _validate_custom_exercise(part, old_name)
     if error:
@@ -110,8 +121,9 @@ def rename_exercise(part, old_name, payload):
     if new_name == old_name:
         return _exercise_lists_payload(part=part, exercise=new_name), 200
 
-    if new_name in _effective_body_parts()[part]:
-        return {"error": "その種目はすでに存在します"}, 409
+    duplicate = _duplicate_name_error(part, new_name)
+    if duplicate:
+        return duplicate
 
     CustomExercise.rename(part, old_name, new_name)
     # 履歴・記録・メモに残る参照名も合わせて更新し、リネーム後も記録が引き継がれるようにする

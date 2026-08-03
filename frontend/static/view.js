@@ -333,6 +333,27 @@ class IronLogView {
   }
 
   /**
+   * 種目名フォーム共通の送信処理：空チェック → 非同期送信 → 失敗時のみエラー表示。
+   * 追加フォームと名前変更フォームで共有する。
+   * 成功時は一覧全体が再描画されるので、呼び出し側での後処理は不要。
+   */
+  async _submitExerciseName(rawValue, errorEl, onSubmit) {
+    const name = rawValue.trim();
+    errorEl.hidden = true;
+    if (!name) {
+      errorEl.textContent = "種目名を入力してください。";
+      errorEl.hidden = false;
+      return;
+    }
+    try {
+      await onSubmit(name);
+    } catch (err) {
+      errorEl.textContent = err.message;
+      errorEl.hidden = false;
+    }
+  }
+
+  /**
    * items: [{ exercise, part, label, meta, editable }, ...]
    * handlers: {
    *   onSelect(item),                       … 通常時、行クリックで種目を選ぶ
@@ -446,22 +467,8 @@ class IronLogView {
       }
     };
 
-    const submit = async () => {
-      const newName = input.value.trim();
-      errorEl.hidden = true;
-      if (!newName) {
-        errorEl.textContent = "種目名を入力してください。";
-        errorEl.hidden = false;
-        return;
-      }
-      try {
-        await onRename(item.part, item.exercise, newName);
-        // 成功時は一覧が再描画されるので後処理は不要
-      } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.hidden = false;
-      }
-    };
+    const submit = () =>
+      this._submitExerciseName(input.value, errorEl, (name) => onRename(item.part, item.exercise, name));
 
     renameBtn.addEventListener("click", () => showRenameMode(true));
     cancelBtn.addEventListener("click", () => showRenameMode(false));
@@ -547,22 +554,7 @@ class IronLogView {
       toggle.hidden = false;
     };
 
-    const submit = async () => {
-      const name = input.value.trim();
-      errorEl.hidden = true;
-      if (!name) {
-        errorEl.textContent = "種目名を入力してください。";
-        errorEl.hidden = false;
-        return;
-      }
-      try {
-        await onAddExercise(name);
-        // 成功時は一覧が再描画されるので後処理は不要
-      } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.hidden = false;
-      }
-    };
+    const submit = () => this._submitExerciseName(input.value, errorEl, (name) => onAddExercise(name));
 
     toggle.addEventListener("click", openForm);
     cancelBtn.addEventListener("click", closeForm);
