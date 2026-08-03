@@ -281,8 +281,8 @@ class IronLogView {
       card.innerHTML = `
         <div class="hc-header">
           <span class="h-name"><span class="h-part-dot" style="background:${color}"></span><span class="h-name-text">${IronLogView.escapeHTML(exercise)}</span></span>
-          ${timerHTML}
           <div class="hc-header-right">
+            ${timerHTML}
             ${bestHTML}
             <button class="btn-history-delete" title="この種目を削除">×</button>
           </div>
