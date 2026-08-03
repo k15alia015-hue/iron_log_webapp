@@ -11,7 +11,8 @@ PRESENTER
 Modelはデータの保存方法だけを知り、Viewはリクエスト/レスポンスの
 形式だけを知る。その間を取り持つのがPresenterの役割。
 
-各関数は (レスポンスに入れるdict, HTTPステータスコード) のタプルを返す。
+各関数は成功時に (レスポンスに入れるdict, HTTPステータスコード) のタプルを返す。
+検証に失敗した場合は ApiError を raise し、errors.py のハンドラが JSON に変換する。
 Flaskのrequest/responseオブジェクトには一切触れず、Viewから渡された
 素のデータ（dict・文字列など）だけを扱う。
 ===================================================================
@@ -19,21 +20,18 @@ Flaskのrequest/responseオブジェクトには一切触れず、Viewから渡�
 
 from datetime import date
 
-from body_parts import merge_body_parts
-from config import BODY_PARTS
+from body_parts import BODY_PARTS, merge_body_parts
+from errors import ApiError
 from extensions import db
 from models import CustomExercise, DayExercise, ExerciseNote, TrainingSet
 
-DATE_FORMAT_ERROR = {"error": "dateはYYYY-MM-DD形式で指定してください"}, 400
-NAME_REQUIRED_ERROR = {"error": "種目名を入力してください"}, 400
 
-
-def _parse_date(date_str):
-    """YYYY-MM-DD形式の文字列をdateに変換する。不正な場合はNoneを返す。"""
+def _require_date(date_str):
+    """YYYY-MM-DD形式の文字列をdateに変換する。不正な場合はApiErrorを送出する。"""
     try:
         return date.fromisoformat(date_str)
     except (TypeError, ValueError):
-        return None
+        raise ApiError("dateはYYYY-MM-DD形式で指定してください", 400)
 
 
 def _effective_body_parts():
@@ -55,27 +53,21 @@ def _exercise_lists_payload(**extra):
     return payload
 
 
-def _validate_custom_exercise(part, exercise):
-    """部位が正しく、かつ指定種目がユーザー追加種目であることを検証する。
-
-    問題なければNone、あればエラーレスポンス(dict, status)を返す。
-    """
+def _require_custom_exercise(part, exercise):
+    """部位が正しく、かつ指定種目がユーザー追加種目であることを検証する（不正ならApiError）。"""
     if part not in BODY_PARTS:
-        return {"error": "指定された部位が正しくありません"}, 400
+        raise ApiError("指定された部位が正しくありません", 400)
     if not CustomExercise.exists(part, exercise):
-        return {"error": "その種目は編集・削除できません（初期種目は変更できません）"}, 400
-    return None
+        raise ApiError("その種目は編集・削除できません（初期種目は変更できません）", 400)
 
 
-def _duplicate_name_error(part, name):
-    """指定した種目名がその部位に既に存在すれば409エラー、なければNoneを返す。
-
-    初期マスタ・ユーザー追加分のどちらかにあれば重複として扱う。
-    """
+def _reject_duplicate_name(part, name):
+    """指定した種目名がその部位に既に存在すれば重複エラー（初期・ユーザー追加のどちらも対象）。"""
     if name in _effective_body_parts()[part]:
-        return {"error": "その種目はすでに存在します"}, 409
-    return None
+        raise ApiError("その種目はすでに存在します", 409)
 
+
+# ---------------- 部位・種目 ----------------
 
 def get_body_parts():
     return _effective_body_parts(), 200
@@ -90,18 +82,16 @@ def add_exercise(payload):
     exercise = payload.get("exercise")
 
     if not part or not exercise:
-        return {"error": "part, exercise は必須です"}, 400
+        raise ApiError("part, exercise は必須です", 400)
 
     exercise = exercise.strip()
     if not exercise:
-        return NAME_REQUIRED_ERROR
+        raise ApiError("種目名を入力してください", 400)
 
     if part not in BODY_PARTS:
-        return {"error": "指定された部位が正しくありません"}, 400
+        raise ApiError("指定された部位が正しくありません", 400)
 
-    duplicate = _duplicate_name_error(part, exercise)
-    if duplicate:
-        return duplicate
+    _reject_duplicate_name(part, exercise)
 
     CustomExercise.create(part, exercise)
     db.session.commit()
@@ -112,18 +102,14 @@ def add_exercise(payload):
 def rename_exercise(part, old_name, payload):
     new_name = (payload.get("newName") or "").strip()
     if not new_name:
-        return NAME_REQUIRED_ERROR
+        raise ApiError("種目名を入力してください", 400)
 
-    error = _validate_custom_exercise(part, old_name)
-    if error:
-        return error
+    _require_custom_exercise(part, old_name)
 
     if new_name == old_name:
         return _exercise_lists_payload(part=part, exercise=new_name), 200
 
-    duplicate = _duplicate_name_error(part, new_name)
-    if duplicate:
-        return duplicate
+    _reject_duplicate_name(part, new_name)
 
     CustomExercise.rename(part, old_name, new_name)
     # 履歴・記録・メモに残る参照名も合わせて更新し、リネーム後も記録が引き継がれるようにする
@@ -136,9 +122,7 @@ def rename_exercise(part, old_name, payload):
 
 
 def delete_exercise(part, exercise):
-    error = _validate_custom_exercise(part, exercise)
-    if error:
-        return error
+    _require_custom_exercise(part, exercise)
 
     CustomExercise.delete(part, exercise)
     # この種目に紐づく履歴・記録・メモもすべて削除する
@@ -163,7 +147,7 @@ def add_set(payload):
     set_date = payload.get("date")
 
     if not exercise or weight is None or reps is None:
-        return {"error": "exercise, weight, reps は必須です"}, 400
+        raise ApiError("exercise, weight, reps は必須です", 400)
 
     try:
         weight = float(weight)
@@ -171,14 +155,9 @@ def add_set(payload):
         if reps <= 0 or weight < 0:
             raise ValueError
     except (TypeError, ValueError):
-        return {"error": "weightは数値、repsは1以上の整数で指定してください"}, 400
+        raise ApiError("weightは数値、repsは1以上の整数で指定してください", 400)
 
-    if set_date:
-        set_date = _parse_date(set_date)
-        if set_date is None:
-            return DATE_FORMAT_ERROR
-    else:
-        set_date = date.today()
+    set_date = _require_date(set_date) if set_date else date.today()
 
     TrainingSet.create(exercise, weight, reps, set_date)
     db.session.commit()
@@ -191,7 +170,7 @@ def delete_set(exercise, index):
     sets = TrainingSet.for_exercise(exercise)
 
     if not (0 <= index < len(sets)):
-        return {"error": "指定されたセットが見つかりません"}, 404
+        raise ApiError("指定されたセットが見つかりません", 404)
 
     removed = sets.pop(index)
     removed_dict = removed.to_dict()
@@ -213,15 +192,13 @@ def add_day_exercise(payload):
     exercise = payload.get("exercise")
 
     if not day or not part or not exercise:
-        return {"error": "date, part, exercise は必須です"}, 400
+        raise ApiError("date, part, exercise は必須です", 400)
 
-    day_value = _parse_date(day)
-    if day_value is None:
-        return DATE_FORMAT_ERROR
+    day_value = _require_date(day)
 
     effective = _effective_body_parts()
     if part not in effective or exercise not in effective[part]:
-        return {"error": "指定された部位・種目の組み合わせが正しくありません"}, 400
+        raise ApiError("指定された部位・種目の組み合わせが正しくありません", 400)
 
     if not DayExercise.exists(day_value, part, exercise):
         DayExercise.create(day_value, part, exercise)
@@ -232,9 +209,7 @@ def add_day_exercise(payload):
 
 
 def delete_day_exercise(day, part, exercise):
-    day_value = _parse_date(day)
-    if day_value is None:
-        return DATE_FORMAT_ERROR
+    day_value = _require_date(day)
 
     DayExercise.delete(day_value, part, exercise)
 
@@ -263,7 +238,7 @@ def save_exercise_note(payload):
     note = payload.get("note", "")
 
     if not exercise:
-        return {"error": "exercise は必須です"}, 400
+        raise ApiError("exercise は必須です", 400)
 
     if note:
         ExerciseNote.upsert(exercise, note)

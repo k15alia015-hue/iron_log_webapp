@@ -5,6 +5,8 @@ Flask拡張のインスタンスを保持する。
 models.py / app.py の両方から参照されるため、循環importを避けるために独立させている。
 """
 
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
+migrate = Migrate()

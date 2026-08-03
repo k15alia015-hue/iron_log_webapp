@@ -6,6 +6,11 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+.pytest_cache/
+
+# SQLite（テスト・一時DB。本番はMySQL）
+*.db
+backend/instance/
 
 # 旧JSONデータ・バックアップ(移行済み、DBが正となる)
 _backup_before_mvp_refactor/
