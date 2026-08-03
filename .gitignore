@@ -1,0 +1,14 @@
+# 環境変数・秘密情報
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 旧JSONデータ・バックアップ(移行済み、DBが正となる)
+_backup_before_mvp_refactor/
+training_data.json
+day_exercises.json
+exercise_notes.json

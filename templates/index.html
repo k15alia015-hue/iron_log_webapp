@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IRON LOG - 筋トレ記録</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-mark">IL</span>
+      <div class="brand-text">
+        <h1>IRON&nbsp;LOG</h1>
+        <p>今日の重量を、正確に刻む。</p>
+      </div>
+    </div>
+    <nav class="crumbs" id="crumbs" aria-label="現在地">
+      <button class="crumb crumb-root" data-nav="calendar">カレンダー</button>
+    </nav>
+  </div>
+</header>
+
+<main class="app-main">
+
+  <!-- STEP 0: カレンダー選択 -->
+  <section class="view" id="view-calendar" data-view="calendar">
+    <h2 class="view-title"><span class="view-index">01</span>日付を選ぶ</h2>
+
+    <div class="calendar-card">
+      <div class="calendar-nav">
+        <button class="cal-nav-btn" id="cal-prev" aria-label="前の月">‹</button>
+        <div class="calendar-month" id="calendar-month-label">2026年8月</div>
+        <button class="cal-nav-btn" id="cal-next" aria-label="次の月">›</button>
+      </div>
+
+      <div class="calendar-weekdays">
+        <span class="wd wd-sun">日</span><span class="wd">月</span><span class="wd">火</span>
+        <span class="wd">水</span><span class="wd">木</span><span class="wd">金</span><span class="wd wd-sat">土</span>
+      </div>
+
+      <div class="calendar-grid" id="calendar-grid"></div>
+
+      <button class="today-jump" id="btn-today">今日を選ぶ</button>
+    </div>
+
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- STEP 1: トレーニング履歴一覧（全種目） -->
+  <section class="view" id="view-history" data-view="history" hidden>
+    <button class="back-link" id="back-to-calendar-from-history">← カレンダーに戻る</button>
+    <h2 class="view-title"><span class="view-index">02</span><span id="history-view-heading">トレーニング履歴</span></h2>
+
+    <div class="history-actions">
+      <button class="btn-history-action btn-history-add" id="btn-add-exercise">＋ 種目を追加</button>
+      <button class="btn-history-action btn-history-remove" id="btn-remove-exercise">－ 種目を削除</button>
+    </div>
+
+    <div class="history-list" id="history-list"></div>
+    <p class="empty-state" id="history-empty">まだ種目が追加されていません。「＋ 種目を追加」から始めましょう。</p>
+  </section>
+
+  <!-- STEP 2: 部位選択 -->
+  <section class="view" id="view-parts" data-view="parts" hidden>
+    <button class="back-link" id="back-to-history">← 履歴に戻る</button>
+    <h2 class="view-title"><span class="view-index">03</span>部位を選ぶ</h2>
+    <p class="selected-date-banner" id="selected-date-banner"></p>
+    <div class="tile-grid" id="body-part-grid"></div>
+  </section>
+
+  <!-- STEP 3: 種目選択 -->
+  <section class="view" id="view-exercises" data-view="exercises" hidden>
+    <button class="back-link" id="back-to-parts-or-history">← 戻る</button>
+    <h2 class="view-title"><span class="view-index">04</span><span id="exercise-view-heading">種目を選ぶ</span></h2>
+    <div class="exercise-list" id="exercise-list"></div>
+  </section>
+
+</main>
+
+<button class="fab-all" id="btn-view-all" title="全記録を見る">全記録</button>
+
+<div class="modal-backdrop" id="modal-backdrop" hidden>
+  <div class="modal" role="dialog" aria-label="全記録">
+    <div class="modal-header">
+      <h3>すべての記録</h3>
+      <button class="modal-close" id="modal-close" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-body" id="all-records-body"></div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='model.js') }}"></script>
+<script src="{{ url_for('static', filename='view.js') }}"></script>
+<script src="{{ url_for('static', filename='presenter.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
