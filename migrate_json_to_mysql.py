@@ -12,7 +12,9 @@ import json
 import os
 from datetime import date
 
-from app import DayExercise, ExerciseNote, TrainingSet, app, db
+from app import app
+from extensions import db
+from models import DayExercise, ExerciseNote, TrainingSet
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "training_data.json")
