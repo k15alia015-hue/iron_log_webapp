@@ -60,7 +60,7 @@ class IronLogView {
   // ---------------- 時間表示ユーティリティ ----------------
 
   static REST_MINUTES = [1, 2, 3, 4, 5];
-  static REST_SECONDS = [10, 20, 30, 40, 50];
+  static REST_SECONDS = [0, 10, 20, 30, 40, 50];
 
   /** 秒数を "m:ss" 形式にする */
   static formatClock(totalSeconds) {
@@ -270,17 +270,22 @@ class IronLogView {
 
       const timerHTML = `
         <div class="hc-timer" data-timer-exercise="${IronLogView.escapeHTML(exercise)}">
-          <button type="button" class="hc-timer-label" title="レスト時間の設定">⏱ <span class="hc-timer-text"></span></button>
-          <button type="button" class="hc-timer-toggle" title="タイマー開始／停止" hidden>▶</button>
+          <span class="hc-timer-caption">タイマー</span>
+          <div class="hc-timer-controls">
+            <button type="button" class="hc-timer-label" title="レスト時間の設定">⏱ <span class="hc-timer-text"></span></button>
+            <button type="button" class="hc-timer-toggle" title="タイマー開始／停止" hidden>▶</button>
+          </div>
         </div>
       `;
 
       card.innerHTML = `
         <div class="hc-header">
-          <span class="h-name"><span class="h-part-dot" style="background:${color}"></span>${IronLogView.escapeHTML(exercise)}</span>
+          <span class="h-name"><span class="h-part-dot" style="background:${color}"></span><span class="h-name-text">${IronLogView.escapeHTML(exercise)}</span></span>
           ${timerHTML}
-          ${bestHTML}
-          <button class="btn-history-delete" title="この種目を削除">×</button>
+          <div class="hc-header-right">
+            ${bestHTML}
+            <button class="btn-history-delete" title="この種目を削除">×</button>
+          </div>
         </div>
         <div class="hc-memo">
           <textarea class="hc-memo-input" placeholder="メモを入力（前回の内容が残ります）" rows="2">${IronLogView.escapeHTML(note)}</textarea>
@@ -439,9 +444,13 @@ class IronLogView {
     }
 
     return this._openModal(this.el.timerBackdrop, ({ close, on }) => {
+      // 0秒も有効な選択なので、未選択(null)かどうかで判定する
+      const bothSelected = () => selMin !== null && selSec !== null;
+
       const refresh = () => {
-        if (selMin && selSec) {
-          this.el.timerPreview.textContent = `${selMin}分${selSec}秒（${IronLogView.formatClock(selMin * 60 + selSec)}）`;
+        if (bothSelected()) {
+          const secLabel = String(selSec).padStart(2, "0");
+          this.el.timerPreview.textContent = `${selMin}分${secLabel}秒（${IronLogView.formatClock(selMin * 60 + selSec)}）`;
           this.el.timerApply.disabled = false;
         } else {
           this.el.timerPreview.textContent = "分と秒を選択してください";
@@ -471,7 +480,7 @@ class IronLogView {
       buildOptions(this.el.timerSeconds, IronLogView.REST_SECONDS, () => selSec, (v) => { selSec = v; });
       refresh();
 
-      on(this.el.timerApply, "click", () => { if (selMin && selSec) close(selMin * 60 + selSec); });
+      on(this.el.timerApply, "click", () => { if (bothSelected()) close(selMin * 60 + selSec); });
       on(this.el.timerDisable, "click", () => close(0));
       on(this.el.timerCancel, "click", () => close(null));
       return null; // Escape・背景クリック = キャンセル

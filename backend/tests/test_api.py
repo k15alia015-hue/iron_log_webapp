@@ -163,8 +163,16 @@ def test_timer_disable_removes_setting(client):
     assert "ベンチプレス" not in client.get("/api/exercise-timers").get_json()
 
 
+def test_timer_allows_zero_seconds(client):
+    # 1分00秒(=60秒)のように秒0も選べる
+    res = client.post("/api/exercise-timers", json={"exercise": "ベンチプレス", "restSeconds": 60})
+    assert res.status_code == 200
+    assert res.get_json()["restSeconds"] == 60
+    assert client.get("/api/exercise-timers").get_json()["ベンチプレス"] == 60
+
+
 def test_timer_rejects_invalid_value(client):
-    # 分1〜5・秒10〜50の組み合わせ以外は拒否（95秒 = 1分35秒は不正）
+    # 分1〜5・秒0/10〜50の組み合わせ以外は拒否（95秒 = 1分35秒は不正）
     res = client.post("/api/exercise-timers", json={"exercise": "ベンチプレス", "restSeconds": 95})
     assert res.status_code == 400
 
