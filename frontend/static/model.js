@@ -29,6 +29,7 @@ class IronLogModel {
     this.allSets = {};        // { "ベンチプレス": [ {weight, reps, date}, ... ], ... }
     this.dayExercises = {};   // { "2026-08-05": [ {part, exercise}, ... ], ... }
     this.exerciseNotes = {};  // { "ベンチプレス": "メモの内容", ... }
+    this.exerciseTimers = {}; // { "ベンチプレス": 90, ... }（レスト秒数。無い＝不使用）
     this.exerciseToPart = {}; // { "ベンチプレス": "胸", ... }
   }
 
@@ -46,17 +47,19 @@ class IronLogModel {
   // ---------------- 初期読み込み ----------------
 
   async loadAll() {
-    const [bodyParts, customExercises, allSets, dayExercises, exerciseNotes] = await Promise.all([
+    const [bodyParts, customExercises, allSets, dayExercises, exerciseNotes, exerciseTimers] = await Promise.all([
       this._fetchJSON("/api/body-parts"),
       this._fetchJSON("/api/custom-exercises"),
       this._fetchJSON("/api/sets"),
       this._fetchJSON("/api/day-exercises"),
       this._fetchJSON("/api/exercise-notes"),
+      this._fetchJSON("/api/exercise-timers"),
     ]);
 
     this.allSets = allSets;
     this.dayExercises = dayExercises;
     this.exerciseNotes = exerciseNotes;
+    this.exerciseTimers = exerciseTimers;
 
     this._setBodyParts(bodyParts);
     this.customExercises = customExercises;
@@ -208,6 +211,25 @@ class IronLogModel {
       body: JSON.stringify({ exercise, note }),
     });
     this.exerciseNotes[exercise] = result.note;
+    return result;
+  }
+
+  /** 種目のレスト秒数を返す（0＝不使用） */
+  getTimer(exercise) {
+    return this.exerciseTimers[exercise] || 0;
+  }
+
+  async saveTimer(exercise, restSeconds) {
+    const result = await this._fetchJSON("/api/exercise-timers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ exercise, restSeconds }),
+    });
+    if (result.restSeconds > 0) {
+      this.exerciseTimers[exercise] = result.restSeconds;
+    } else {
+      delete this.exerciseTimers[exercise];
+    }
     return result;
   }
 

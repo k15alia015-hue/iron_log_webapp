@@ -23,7 +23,15 @@ from datetime import date
 from body_parts import BODY_PARTS, merge_body_parts
 from errors import ApiError
 from extensions import db
-from models import CustomExercise, DayExercise, ExerciseNote, TrainingSet
+from models import CustomExercise, DayExercise, ExerciseNote, ExerciseTimer, TrainingSet
+
+# レストタイマーで選べるレスト秒数（分 1〜5 × 秒 10/20/30/40/50 の組み合わせ）。
+# 0 は「不使用」を表す。
+ALLOWED_REST_SECONDS = frozenset(
+    minutes * 60 + seconds
+    for minutes in range(1, 6)
+    for seconds in (10, 20, 30, 40, 50)
+)
 
 
 def _require_date(date_str):
@@ -112,10 +120,11 @@ def rename_exercise(part, old_name, payload):
     _reject_duplicate_name(part, new_name)
 
     CustomExercise.rename(part, old_name, new_name)
-    # 履歴・記録・メモに残る参照名も合わせて更新し、リネーム後も記録が引き継がれるようにする
+    # 履歴・記録・メモ・タイマーに残る参照名も合わせて更新し、リネーム後も設定が引き継がれるようにする
     DayExercise.rename_exercise_in_part(part, old_name, new_name)
     TrainingSet.rename_exercise(old_name, new_name)
     ExerciseNote.rename_exercise(old_name, new_name)
+    ExerciseTimer.rename_exercise(old_name, new_name)
     db.session.commit()
 
     return _exercise_lists_payload(part=part, exercise=new_name), 200
@@ -125,10 +134,11 @@ def delete_exercise(part, exercise):
     _require_custom_exercise(part, exercise)
 
     CustomExercise.delete(part, exercise)
-    # この種目に紐づく履歴・記録・メモもすべて削除する
+    # この種目に紐づく履歴・記録・メモ・タイマーもすべて削除する
     DayExercise.delete_all_for_exercise(part, exercise)
     TrainingSet.delete_by_exercise(exercise)
     ExerciseNote.delete_by_exercise(exercise)
+    ExerciseTimer.delete_by_exercise(exercise)
     db.session.commit()
 
     return _exercise_lists_payload(part=part, exercise=exercise), 200
@@ -248,3 +258,35 @@ def save_exercise_note(payload):
 
     saved = ExerciseNote.get(exercise)
     return {"exercise": exercise, "note": saved.note if saved else ""}, 200
+
+
+# ---------------- レストタイマー ----------------
+
+def get_exercise_timers():
+    return ExerciseTimer.all_as_dict(), 200
+
+
+def save_exercise_timer(payload):
+    exercise = payload.get("exercise")
+    rest_seconds = payload.get("restSeconds")
+
+    if not exercise:
+        raise ApiError("exercise は必須です", 400)
+
+    try:
+        rest_seconds = int(rest_seconds)
+    except (TypeError, ValueError):
+        raise ApiError("restSeconds は整数で指定してください", 400)
+
+    if rest_seconds <= 0:
+        # 0以下は「不使用」。設定があれば削除する。
+        ExerciseTimer.delete(exercise)
+        db.session.commit()
+        return {"exercise": exercise, "restSeconds": 0}, 200
+
+    if rest_seconds not in ALLOWED_REST_SECONDS:
+        raise ApiError("指定できないレスト時間です（分1〜5・秒10〜50から選択してください）", 400)
+
+    ExerciseTimer.upsert(exercise, rest_seconds)
+    db.session.commit()
+    return {"exercise": exercise, "restSeconds": rest_seconds}, 200

@@ -25,6 +25,8 @@ VIEW
                                   その日の種目を削除する（紐づくセットも削除）
   GET    /api/exercise-notes    種目ごとのメモ一覧を返す
   POST   /api/exercise-notes    種目のメモを保存する { exercise, note }
+  GET    /api/exercise-timers   種目ごとのレストタイマー設定を返す
+  POST   /api/exercise-timers   タイマーを保存する { exercise, restSeconds }（0で不使用）
 ===================================================================
 """
 
@@ -114,3 +116,14 @@ def list_exercise_notes():
 def create_exercise_note():
     payload = request.get_json(silent=True) or {}
     return _respond(presenters.save_exercise_note(payload))
+
+
+@bp.route("/api/exercise-timers", methods=["GET"])
+def list_exercise_timers():
+    return _respond(presenters.get_exercise_timers())
+
+
+@bp.route("/api/exercise-timers", methods=["POST"])
+def create_exercise_timer():
+    payload = request.get_json(silent=True) or {}
+    return _respond(presenters.save_exercise_timer(payload))
