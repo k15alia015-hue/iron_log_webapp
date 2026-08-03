@@ -2,8 +2,27 @@
 # -*- coding: utf-8 -*-
 """
 部位ごとの種目マスタデータ。
-増やしたい種目がある場合はこのファイルに追記する。
+ここに定義した初期種目に加え、ユーザーがアプリ上で追加した種目
+(DBのcustom_exercisesテーブル)を合成したものが実際の一覧になる。
 """
+
+
+def merge_body_parts(base, custom):
+    """初期マスタ(base)とユーザー追加種目(custom)を部位ごとに結合する。
+
+    base:   { part: [exercise, ...] }
+    custom: { part: [exercise, ...] }  … 追加分（重複・未知の部位は無視）
+    戻り値は base をコピーした新しい辞書。
+    """
+    merged = {part: list(exercises) for part, exercises in base.items()}
+    for part, exercises in custom.items():
+        if part not in merged:
+            continue
+        for exercise in exercises:
+            if exercise not in merged[part]:
+                merged[part].append(exercise)
+    return merged
+
 
 BODY_PARTS = {
     "胸": [

@@ -42,6 +42,10 @@ class IronLogView {
       modalBackdrop: document.getElementById("modal-backdrop"),
       modalClose: document.getElementById("modal-close"),
       allRecordsBody: document.getElementById("all-records-body"),
+      confirmBackdrop: document.getElementById("confirm-backdrop"),
+      confirmMessage: document.getElementById("confirm-message"),
+      confirmYes: document.getElementById("confirm-yes"),
+      confirmNo: document.getElementById("confirm-no"),
     };
   }
 
@@ -329,36 +333,246 @@ class IronLogView {
   }
 
   /**
-   * items: [{ exercise, part, label, meta }, ...]
+   * items: [{ exercise, part, label, meta, editable }, ...]
+   * handlers: {
+   *   onSelect(item),                       … 通常時、行クリックで種目を選ぶ
+   *   emptyMessage,                         … 一覧が空のときの文言
+   *   onAddExercise(name),                  … 指定すると一覧の下に「種目の追加」UIを出す
+   *   editMode,                             … true のとき編集モードで描画する
+   *   onEditToggle(),                       … 「種目の編集」ボタン押下
+   *   onRename(part, oldName, newName),     … 編集モードで名前変更（失敗時throwでフォームに表示）
+   *   onDelete(part, exercise),             … 編集モードで削除（確認ダイアログ込み）
+   * }
    */
-  renderExercisePicker(items, onSelectItem, emptyMessage) {
+  renderExercisePicker(items, handlers = {}) {
+    const { onSelect, emptyMessage, onAddExercise, editMode, onEditToggle, onRename, onDelete } = handlers;
     this.el.exerciseList.innerHTML = "";
-
-    if (items.length === 0) {
-      const msg = document.createElement("p");
-      msg.className = "empty-state";
-      msg.textContent = emptyMessage || "選択できる種目がありません。";
-      this.el.exerciseList.appendChild(msg);
-      return;
-    }
 
     const wrap = document.createElement("div");
     wrap.style.display = "flex";
     wrap.style.flexDirection = "column";
     wrap.style.gap = "8px";
 
+    if (items.length === 0) {
+      const msg = document.createElement("p");
+      msg.className = "empty-state";
+      msg.textContent = emptyMessage || "選択できる種目がありません。";
+      wrap.appendChild(msg);
+    }
+
     items.forEach((item) => {
-      const el = document.createElement("button");
-      el.className = "exercise-item";
-      el.innerHTML = `
-        <span class="ex-name">${IronLogView.escapeHTML(item.label)}</span>
-        <span class="ex-meta">${IronLogView.escapeHTML(item.meta)}</span>
-      `;
-      el.addEventListener("click", () => onSelectItem(item));
-      wrap.appendChild(el);
+      if (editMode && item.editable) {
+        wrap.appendChild(this._buildEditableExerciseRow(item, onRename, onDelete));
+      } else if (editMode) {
+        wrap.appendChild(this._buildStaticExerciseRow(item));
+      } else {
+        wrap.appendChild(this._buildSelectableExerciseRow(item, onSelect));
+      }
     });
 
+    if (onAddExercise) {
+      wrap.appendChild(this._buildAddExerciseForm(onAddExercise));
+    }
+    if (onEditToggle) {
+      wrap.appendChild(this._buildEditToggle(editMode, onEditToggle));
+    }
+
     this.el.exerciseList.appendChild(wrap);
+  }
+
+  /** 通常モードの、クリックで選択できる種目行 */
+  _buildSelectableExerciseRow(item, onSelect) {
+    const el = document.createElement("button");
+    el.className = "exercise-item";
+    el.innerHTML = `
+      <span class="ex-name">${IronLogView.escapeHTML(item.label)}</span>
+      <span class="ex-meta">${IronLogView.escapeHTML(item.meta)}</span>
+    `;
+    el.addEventListener("click", () => onSelect(item));
+    return el;
+  }
+
+  /** 編集モードで、編集できない（初期）種目を表示するだけの行 */
+  _buildStaticExerciseRow(item) {
+    const el = document.createElement("div");
+    el.className = "exercise-item is-static";
+    el.innerHTML = `
+      <span class="ex-name">${IronLogView.escapeHTML(item.exercise)}</span>
+      <span class="ex-meta">初期種目</span>
+    `;
+    return el;
+  }
+
+  /** 編集モードで、名前変更・削除ができるユーザー追加種目の行 */
+  _buildEditableExerciseRow(item, onRename, onDelete) {
+    const row = document.createElement("div");
+    row.className = "exercise-item exercise-item-edit";
+    row.innerHTML = `
+      <div class="ex-edit-line">
+        <div class="ex-edit-main">
+          <span class="ex-name">${IronLogView.escapeHTML(item.exercise)}</span>
+          <input type="text" class="ex-rename-input" maxlength="255" hidden>
+        </div>
+        <div class="ex-edit-actions">
+          <button type="button" class="ex-rename-btn">名前の変更</button>
+          <button type="button" class="ex-delete-btn">種目の削除</button>
+          <button type="button" class="ex-rename-save" hidden>保存</button>
+          <button type="button" class="ex-rename-cancel" hidden>キャンセル</button>
+        </div>
+      </div>
+      <p class="ex-edit-error" hidden></p>
+    `;
+
+    const nameLabel = row.querySelector(".ex-name");
+    const input = row.querySelector(".ex-rename-input");
+    const renameBtn = row.querySelector(".ex-rename-btn");
+    const deleteBtn = row.querySelector(".ex-delete-btn");
+    const saveBtn = row.querySelector(".ex-rename-save");
+    const cancelBtn = row.querySelector(".ex-rename-cancel");
+    const errorEl = row.querySelector(".ex-edit-error");
+
+    const showRenameMode = (on) => {
+      nameLabel.hidden = on;
+      input.hidden = !on;
+      renameBtn.hidden = on;
+      deleteBtn.hidden = on;
+      saveBtn.hidden = !on;
+      cancelBtn.hidden = !on;
+      errorEl.hidden = true;
+      if (on) {
+        input.value = item.exercise;
+        input.focus();
+        input.select();
+      }
+    };
+
+    const submit = async () => {
+      const newName = input.value.trim();
+      errorEl.hidden = true;
+      if (!newName) {
+        errorEl.textContent = "種目名を入力してください。";
+        errorEl.hidden = false;
+        return;
+      }
+      try {
+        await onRename(item.part, item.exercise, newName);
+        // 成功時は一覧が再描画されるので後処理は不要
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.hidden = false;
+      }
+    };
+
+    renameBtn.addEventListener("click", () => showRenameMode(true));
+    cancelBtn.addEventListener("click", () => showRenameMode(false));
+    saveBtn.addEventListener("click", submit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
+      if (e.key === "Escape") showRenameMode(false);
+    });
+    deleteBtn.addEventListener("click", () => onDelete(item.part, item.exercise));
+
+    return row;
+  }
+
+  /** 「種目の編集」トグルボタン */
+  _buildEditToggle(editMode, onEditToggle) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "edit-exercise-toggle" + (editMode ? " is-active" : "");
+    btn.textContent = editMode ? "編集を終了" : "✎ 種目の編集";
+    btn.addEventListener("click", onEditToggle);
+    return btn;
+  }
+
+  /** 「本当に削除してよろしいですか？」の確認ダイアログ。はい→true / いいえ→false を返す */
+  confirm(message) {
+    return new Promise((resolve) => {
+      this.el.confirmMessage.textContent = message;
+      this.el.confirmBackdrop.hidden = false;
+
+      const cleanup = () => {
+        this.el.confirmBackdrop.hidden = true;
+        this.el.confirmYes.removeEventListener("click", onYes);
+        this.el.confirmNo.removeEventListener("click", onNo);
+        this.el.confirmBackdrop.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onKey);
+      };
+      const onYes = () => { cleanup(); resolve(true); };
+      const onNo = () => { cleanup(); resolve(false); };
+      const onBackdrop = (e) => { if (e.target === this.el.confirmBackdrop) { cleanup(); resolve(false); } };
+      const onKey = (e) => { if (e.key === "Escape") { cleanup(); resolve(false); } };
+
+      this.el.confirmYes.addEventListener("click", onYes);
+      this.el.confirmNo.addEventListener("click", onNo);
+      this.el.confirmBackdrop.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onKey);
+      this.el.confirmNo.focus();
+    });
+  }
+
+  /** 「＋ 種目を追加」ボタン → クリックで入力欄が開き、保存するフォーム部品を生成する */
+  _buildAddExerciseForm(onAddExercise) {
+    const box = document.createElement("div");
+    box.className = "add-exercise-box";
+    box.innerHTML = `
+      <button type="button" class="add-exercise-toggle">＋ 種目を追加</button>
+      <div class="add-exercise-form" hidden>
+        <input type="text" class="add-exercise-input" placeholder="新しい種目名を入力" maxlength="255">
+        <div class="add-exercise-actions">
+          <button type="button" class="add-exercise-cancel">キャンセル</button>
+          <button type="button" class="add-exercise-save">保存</button>
+        </div>
+        <p class="add-exercise-error" hidden></p>
+      </div>
+    `;
+
+    const toggle = box.querySelector(".add-exercise-toggle");
+    const form = box.querySelector(".add-exercise-form");
+    const input = box.querySelector(".add-exercise-input");
+    const cancelBtn = box.querySelector(".add-exercise-cancel");
+    const saveBtn = box.querySelector(".add-exercise-save");
+    const errorEl = box.querySelector(".add-exercise-error");
+
+    const openForm = () => {
+      toggle.hidden = true;
+      form.hidden = false;
+      errorEl.hidden = true;
+      input.value = "";
+      input.focus();
+    };
+
+    const closeForm = () => {
+      form.hidden = true;
+      toggle.hidden = false;
+    };
+
+    const submit = async () => {
+      const name = input.value.trim();
+      errorEl.hidden = true;
+      if (!name) {
+        errorEl.textContent = "種目名を入力してください。";
+        errorEl.hidden = false;
+        return;
+      }
+      try {
+        await onAddExercise(name);
+        // 成功時は一覧が再描画されるので後処理は不要
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.hidden = false;
+      }
+    };
+
+    toggle.addEventListener("click", openForm);
+    cancelBtn.addEventListener("click", closeForm);
+    saveBtn.addEventListener("click", submit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submit();
+      if (e.key === "Escape") closeForm();
+    });
+
+    return box;
   }
 
   // ---------------- 全記録モーダル ----------------

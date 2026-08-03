@@ -12,6 +12,10 @@ VIEW
 「どのURLにアクセスされたら、どのPresenter関数を呼ぶか」だけを担当する。
 
   GET    /api/body-parts        部位と種目の一覧を返す
+  GET    /api/custom-exercises  ユーザーが追加した種目一覧を返す
+  POST   /api/exercises         種目を新規追加する { part, exercise }
+  PATCH  /api/exercises/<part>/<exercise>   種目名を変更する { newName }
+  DELETE /api/exercises/<part>/<exercise>   種目を削除する（紐づく記録も削除）
   GET    /api/sets              記録済みの全セットを返す
   POST   /api/sets              セットを追加する { exercise, weight, reps, date(任意) }
   DELETE /api/sets/<exercise>/<index>  指定した種目のセットを1件削除する
@@ -45,6 +49,28 @@ def index():
 @bp.route("/api/body-parts", methods=["GET"])
 def body_parts():
     return _respond(presenters.get_body_parts())
+
+
+@bp.route("/api/custom-exercises", methods=["GET"])
+def custom_exercises():
+    return _respond(presenters.get_custom_exercises())
+
+
+@bp.route("/api/exercises", methods=["POST"])
+def create_exercise():
+    payload = request.get_json(silent=True) or {}
+    return _respond(presenters.add_exercise(payload))
+
+
+@bp.route("/api/exercises/<part>/<exercise>", methods=["PATCH"])
+def rename_exercise(part, exercise):
+    payload = request.get_json(silent=True) or {}
+    return _respond(presenters.rename_exercise(part, exercise, payload))
+
+
+@bp.route("/api/exercises/<part>/<exercise>", methods=["DELETE"])
+def remove_exercise(part, exercise):
+    return _respond(presenters.delete_exercise(part, exercise))
 
 
 @bp.route("/api/sets", methods=["GET"])

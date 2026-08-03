@@ -19,9 +19,10 @@ Flaskのrequest/responseオブジェクトには一切触れず、Viewから渡�
 
 from datetime import date
 
+from body_parts import merge_body_parts
 from config import BODY_PARTS
 from extensions import db
-from models import DayExercise, ExerciseNote, TrainingSet
+from models import CustomExercise, DayExercise, ExerciseNote, TrainingSet
 
 DATE_FORMAT_ERROR = {"error": "dateはYYYY-MM-DD形式で指定してください"}, 400
 
@@ -34,8 +35,107 @@ def _parse_date(date_str):
         return None
 
 
+def _effective_body_parts():
+    """初期マスタとユーザー追加種目を合成した、実際に使う部位・種目一覧。"""
+    return merge_body_parts(BODY_PARTS, CustomExercise.all_grouped_by_part())
+
+
+def _exercise_lists_payload(**extra):
+    """種目一覧が変化する操作の共通レスポンス。最新の全体像を返す。
+
+    bodyParts:       初期＋ユーザー追加を合成した全種目
+    customExercises: ユーザー追加分だけ（編集・削除できる種目の判定に使う）
+    """
+    payload = {
+        "bodyParts": _effective_body_parts(),
+        "customExercises": CustomExercise.all_grouped_by_part(),
+    }
+    payload.update(extra)
+    return payload
+
+
+def _validate_custom_exercise(part, exercise):
+    """部位が正しく、かつ指定種目がユーザー追加種目であることを検証する。
+
+    問題なければNone、あればエラーレスポンス(dict, status)を返す。
+    """
+    if part not in BODY_PARTS:
+        return {"error": "指定された部位が正しくありません"}, 400
+    if not CustomExercise.exists(part, exercise):
+        return {"error": "その種目は編集・削除できません（初期種目は変更できません）"}, 400
+    return None
+
+
 def get_body_parts():
-    return BODY_PARTS, 200
+    return _effective_body_parts(), 200
+
+
+def get_custom_exercises():
+    return CustomExercise.all_grouped_by_part(), 200
+
+
+def add_exercise(payload):
+    part = payload.get("part")
+    exercise = payload.get("exercise")
+
+    if not part or not exercise:
+        return {"error": "part, exercise は必須です"}, 400
+
+    exercise = exercise.strip()
+    if not exercise:
+        return {"error": "種目名を入力してください"}, 400
+
+    if part not in BODY_PARTS:
+        return {"error": "指定された部位が正しくありません"}, 400
+
+    # 初期マスタ・ユーザー追加分のどちらかに既にあれば重複として扱う
+    if exercise in _effective_body_parts()[part]:
+        return {"error": "その種目はすでに存在します"}, 409
+
+    CustomExercise.create(part, exercise)
+    db.session.commit()
+
+    return _exercise_lists_payload(part=part, exercise=exercise), 201
+
+
+def rename_exercise(part, old_name, payload):
+    new_name = (payload.get("newName") or "").strip()
+    if not new_name:
+        return {"error": "種目名を入力してください"}, 400
+
+    error = _validate_custom_exercise(part, old_name)
+    if error:
+        return error
+
+    if new_name == old_name:
+        return _exercise_lists_payload(part=part, exercise=new_name), 200
+
+    if new_name in _effective_body_parts()[part]:
+        return {"error": "その種目はすでに存在します"}, 409
+
+    CustomExercise.rename(part, old_name, new_name)
+    # 履歴・記録・メモに残る参照名も合わせて更新し、リネーム後も記録が引き継がれるようにする
+    DayExercise.rename_exercise_in_part(part, old_name, new_name)
+    TrainingSet.rename_exercise(old_name, new_name)
+    ExerciseNote.rename_exercise(old_name, new_name)
+    db.session.commit()
+
+    return _exercise_lists_payload(part=part, exercise=new_name), 200
+
+
+def delete_exercise(part, exercise):
+    error = _validate_custom_exercise(part, exercise)
+    if error:
+        return error
+
+    CustomExercise.delete(part, exercise)
+    # この種目に紐づく履歴・記録・メモもすべて削除する
+    DayExercise.delete_all_for_exercise(part, exercise)
+    TrainingSet.delete_by_exercise(exercise)
+    ExerciseNote.delete_by_exercise(exercise)
+    db.session.commit()
+
+    return _exercise_lists_payload(part=part, exercise=exercise), 200
 
 
 # ---------------- セット ----------------
@@ -107,7 +207,8 @@ def add_day_exercise(payload):
     if day_value is None:
         return DATE_FORMAT_ERROR
 
-    if part not in BODY_PARTS or exercise not in BODY_PARTS[part]:
+    effective = _effective_body_parts()
+    if part not in effective or exercise not in effective[part]:
         return {"error": "指定された部位・種目の組み合わせが正しくありません"}, 400
 
     if not DayExercise.exists(day_value, part, exercise):

@@ -94,6 +94,16 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="confirm-backdrop" hidden>
+  <div class="modal modal-confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-message">
+    <p class="confirm-message" id="confirm-message"></p>
+    <div class="confirm-actions">
+      <button class="confirm-btn confirm-no" id="confirm-no">いいえ</button>
+      <button class="confirm-btn confirm-yes" id="confirm-yes">はい</button>
+    </div>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='model.js') }}"></script>
 <script src="{{ url_for('static', filename='view.js') }}"></script>
 <script src="{{ url_for('static', filename='presenter.js') }}"></script>

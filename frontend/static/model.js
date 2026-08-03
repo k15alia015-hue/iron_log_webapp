@@ -24,10 +24,11 @@ class IronLogModel {
       "腹": "#8b5fbf",
     };
 
-    this.bodyParts = {};     // { "胸": ["ベンチプレス", ...], ... }
-    this.allSets = {};       // { "ベンチプレス": [ {weight, reps, date}, ... ], ... }
-    this.dayExercises = {};  // { "2026-08-05": [ {part, exercise}, ... ], ... }
-    this.exerciseNotes = {}; // { "ベンチプレス": "メモの内容", ... }
+    this.bodyParts = {};      // { "胸": ["ベンチプレス", ...], ... }（初期＋ユーザー追加）
+    this.customExercises = {}; // { "胸": ["自作種目", ...], ... }（ユーザー追加分のみ＝編集可能）
+    this.allSets = {};        // { "ベンチプレス": [ {weight, reps, date}, ... ], ... }
+    this.dayExercises = {};   // { "2026-08-05": [ {part, exercise}, ... ], ... }
+    this.exerciseNotes = {};  // { "ベンチプレス": "メモの内容", ... }
     this.exerciseToPart = {}; // { "ベンチプレス": "胸", ... }
   }
 
@@ -45,18 +46,30 @@ class IronLogModel {
   // ---------------- 初期読み込み ----------------
 
   async loadAll() {
-    const [bodyParts, allSets, dayExercises, exerciseNotes] = await Promise.all([
+    const [bodyParts, customExercises, allSets, dayExercises, exerciseNotes] = await Promise.all([
       this._fetchJSON("/api/body-parts"),
+      this._fetchJSON("/api/custom-exercises"),
       this._fetchJSON("/api/sets"),
       this._fetchJSON("/api/day-exercises"),
       this._fetchJSON("/api/exercise-notes"),
     ]);
 
-    this.bodyParts = bodyParts;
     this.allSets = allSets;
     this.dayExercises = dayExercises;
     this.exerciseNotes = exerciseNotes;
 
+    this._setBodyParts(bodyParts);
+    this.customExercises = customExercises;
+  }
+
+  /** その種目がユーザー追加種目（＝名前変更・削除ができる）かどうか */
+  isCustom(part, exercise) {
+    return (this.customExercises[part] || []).includes(exercise);
+  }
+
+  /** 部位・種目一覧をセットし、種目→部位の逆引きマップを組み直す */
+  _setBodyParts(bodyParts) {
+    this.bodyParts = bodyParts;
     this.exerciseToPart = {};
     Object.keys(bodyParts).forEach((part) => {
       bodyParts[part].forEach((exercise) => {
@@ -196,5 +209,47 @@ class IronLogModel {
     });
     this.exerciseNotes[exercise] = result.note;
     return result;
+  }
+
+  async addExercise(part, exercise) {
+    const result = await this._fetchJSON("/api/exercises", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ part, exercise }),
+    });
+    this._applyExerciseLists(result);
+    return result;
+  }
+
+  async renameExercise(part, oldName, newName) {
+    const result = await this._fetchJSON(
+      `/api/exercises/${encodeURIComponent(part)}/${encodeURIComponent(oldName)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newName }),
+      }
+    );
+    this._applyExerciseLists(result);
+    // 履歴・記録・メモの参照名もサーバー側で変わっているため、全体を取り直す
+    await this.loadAll();
+    return result;
+  }
+
+  async deleteExercise(part, exercise) {
+    const result = await this._fetchJSON(
+      `/api/exercises/${encodeURIComponent(part)}/${encodeURIComponent(exercise)}`,
+      { method: "DELETE" }
+    );
+    this._applyExerciseLists(result);
+    // 紐づく履歴・記録・メモもサーバー側で消えているため、全体を取り直す
+    await this.loadAll();
+    return result;
+  }
+
+  /** 種目一覧が変化する操作のレスポンス(bodyParts/customExercises)をキャッシュへ反映する */
+  _applyExerciseLists(result) {
+    if (result.bodyParts) this._setBodyParts(result.bodyParts);
+    if (result.customExercises) this.customExercises = result.customExercises;
   }
 }

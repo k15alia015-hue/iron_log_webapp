@@ -20,14 +20,31 @@ class _GroupedQueryMixin:
     """追加順の全件取得を、指定したキーでグルーピングして返す共通処理。"""
 
     @classmethod
-    def _all_grouped_by(cls, key_func):
+    def _all_grouped_by(cls, key_func, value_func=None):
+        value_func = value_func or (lambda row: row.to_dict())
         data = {}
         for row in cls.query.order_by(cls.id).all():
-            data.setdefault(key_func(row), []).append(row.to_dict())
+            data.setdefault(key_func(row), []).append(value_func(row))
         return data
 
 
-class TrainingSet(_GroupedQueryMixin, db.Model):
+class _ExerciseRefMixin:
+    """exercise列で種目を参照するテーブル共通の、種目名リネーム/一括削除。
+
+    このアプリはセット記録・メモを「種目名」で識別するため、リネーム・削除は
+    種目名単位で行う（day_exercisesのみ部位も持つので、そちらは別途部位で絞る）。
+    """
+
+    @classmethod
+    def rename_exercise(cls, old_name, new_name):
+        cls.query.filter_by(exercise=old_name).update({"exercise": new_name})
+
+    @classmethod
+    def delete_by_exercise(cls, exercise):
+        cls.query.filter_by(exercise=exercise).delete()
+
+
+class TrainingSet(_GroupedQueryMixin, _ExerciseRefMixin, db.Model):
     __tablename__ = "training_sets"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -100,8 +117,55 @@ class DayExercise(_GroupedQueryMixin, db.Model):
     def delete(cls, day_value, part, exercise):
         cls.query.filter_by(day=day_value, part=part, exercise=exercise).delete()
 
+    @classmethod
+    def rename_exercise_in_part(cls, part, old_name, new_name):
+        """指定部位の種目名を一括で変更する（他部位の同名種目には影響させない）。"""
+        cls.query.filter_by(part=part, exercise=old_name).update({"exercise": new_name})
 
-class ExerciseNote(db.Model):
+    @classmethod
+    def delete_all_for_exercise(cls, part, exercise):
+        """指定部位の指定種目の割り当てをすべて削除する。"""
+        cls.query.filter_by(part=part, exercise=exercise).delete()
+
+
+class CustomExercise(_GroupedQueryMixin, db.Model):
+    """ユーザーが追加した種目。部位ごとの初期マスタ(body_parts.py)に対する追加分。"""
+
+    __tablename__ = "custom_exercises"
+    __table_args__ = (db.UniqueConstraint("part", "exercise", name="uq_part_exercise"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    part = db.Column(db.String(50), nullable=False, index=True)
+    exercise = db.Column(db.String(255), nullable=False)
+
+    @classmethod
+    def all_grouped_by_part(cls):
+        """部位 -> 種目名一覧（追加順）の辞書を返す。"""
+        return cls._all_grouped_by(lambda row: row.part, lambda row: row.exercise)
+
+    @classmethod
+    def exists(cls, part, exercise):
+        return cls.query.filter_by(part=part, exercise=exercise).first() is not None
+
+    @classmethod
+    def create(cls, part, exercise):
+        row = cls(part=part, exercise=exercise)
+        db.session.add(row)
+        return row
+
+    @classmethod
+    def rename(cls, part, old_name, new_name):
+        row = cls.query.filter_by(part=part, exercise=old_name).first()
+        if row:
+            row.exercise = new_name
+        return row
+
+    @classmethod
+    def delete(cls, part, exercise):
+        cls.query.filter_by(part=part, exercise=exercise).delete()
+
+
+class ExerciseNote(_ExerciseRefMixin, db.Model):
     __tablename__ = "exercise_notes"
 
     exercise = db.Column(db.String(255), primary_key=True)

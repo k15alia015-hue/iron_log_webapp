@@ -485,6 +485,259 @@ button { font-family: inherit; }
   color: #c7c7cc;
 }
 
+/* Add-exercise UI (種目の追加) */
+
+.add-exercise-box {
+  margin-top: 4px;
+}
+
+.add-exercise-toggle {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--steel);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.add-exercise-toggle:hover {
+  border-color: var(--accent-dim);
+  color: var(--chalk);
+  background: var(--accent-soft);
+}
+
+.add-exercise-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+/* hidden属性がdisplay:flexに負けないよう明示的に打ち消す */
+.add-exercise-form[hidden] {
+  display: none;
+}
+
+.add-exercise-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 10px 12px;
+  color: var(--chalk);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.add-exercise-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.add-exercise-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.add-exercise-cancel,
+.add-exercise-save {
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--chalk);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.add-exercise-cancel:hover { border-color: var(--steel); background: var(--surface-alt); }
+
+.add-exercise-save {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+}
+.add-exercise-save:hover { background: var(--accent); }
+
+.add-exercise-error {
+  color: var(--accent);
+  font-size: 12px;
+  margin: 0;
+}
+
+/* Edit-exercises mode (種目の編集) */
+
+.edit-exercise-toggle {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--steel);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 15px;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.edit-exercise-toggle:hover {
+  border-color: var(--steel);
+  color: var(--chalk);
+  background: var(--surface-alt);
+}
+
+.edit-exercise-toggle.is-active {
+  border-style: solid;
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+  color: var(--chalk);
+}
+
+.exercise-item.is-static {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.exercise-item.is-static .ex-meta {
+  color: var(--muted);
+}
+
+.exercise-item-edit {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  cursor: default;
+}
+
+.ex-edit-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ex-edit-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ex-rename-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 12px;
+  color: var(--chalk);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.ex-rename-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.ex-edit-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ex-rename-btn,
+.ex-delete-btn,
+.ex-rename-save,
+.ex-rename-cancel {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  padding: 8px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--chalk);
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ex-rename-btn:hover,
+.ex-rename-cancel:hover { border-color: var(--steel); background: var(--surface-alt); }
+
+.ex-delete-btn {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+.ex-delete-btn:hover { background: var(--accent-soft); }
+
+.ex-rename-save {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+}
+.ex-rename-save:hover { background: var(--accent); }
+
+.ex-edit-error {
+  color: var(--accent);
+  font-size: 12px;
+  margin: 0;
+}
+
+/* Confirm dialog (削除確認) */
+
+.modal-confirm {
+  max-width: 400px;
+  padding: 24px;
+  gap: 20px;
+}
+
+.confirm-message {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--chalk);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.confirm-btn {
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  padding: 10px 22px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--chalk);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.confirm-no:hover { border-color: var(--steel); background: var(--surface-alt); }
+
+.confirm-yes {
+  border-color: var(--accent-dim);
+  background: var(--accent-soft);
+}
+.confirm-yes:hover { background: var(--accent); }
+
 .back-link {
   background: none;
   border: none;

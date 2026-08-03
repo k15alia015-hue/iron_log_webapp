@@ -24,6 +24,7 @@ class IronLogPresenter {
     this.viewMonth = null;          // 0-11
     this.currentPart = null;
     this.pickerMode = null;         // "add" | "remove"
+    this.editExercisesMode = false; // 種目選択画面で「種目の編集」モードか
     this.visibleInputs = new Set();       // "日付|種目" → 新規セット入力欄を表示中
     this.hiddenActionButtons = new Set(); // "日付|種目" → 削除/追加ボタンを非表示中
   }
@@ -112,6 +113,7 @@ class IronLogPresenter {
 
   selectBodyPart(part) {
     this.currentPart = part;
+    this.editExercisesMode = false; // 部位を選び直したら編集モードは解除
     this.renderExercisePicker();
     this.showView("exercises");
   }
@@ -259,11 +261,10 @@ class IronLogPresenter {
         return { exercise, part: exPart, label: exercise, meta };
       });
 
-      this.view.renderExercisePicker(
-        items,
-        (item) => this.removeDayExercise(item.part, item.exercise),
-        "削除できる種目がありません。"
-      );
+      this.view.renderExercisePicker(items, {
+        onSelect: (item) => this.removeDayExercise(item.part, item.exercise),
+        emptyMessage: "削除できる種目がありません。",
+      });
       return;
     }
 
@@ -282,20 +283,56 @@ class IronLogPresenter {
         ? `直近 ${lastSet.weight}kg×${lastSet.reps} / ${sets.length}セット`
         : "記録なし";
       const addedTag = !isRemoveMode && already.includes(exercise) ? "（追加済み）" : "";
-      return { exercise, part, label: `${exercise}${addedTag}`, meta };
+      return {
+        exercise,
+        part,
+        label: `${exercise}${addedTag}`,
+        meta,
+        editable: this.model.isCustom(part, exercise), // ユーザー追加種目だけ名前変更・削除できる
+      };
     });
 
-    this.view.renderExercisePicker(
-      items,
-      (item) => {
-        if (isRemoveMode) {
-          this.removeDayExercise(part, item.exercise);
-        } else {
-          this.addDayExercise(part, item.exercise);
-        }
+    if (isRemoveMode) {
+      this.view.renderExercisePicker(items, {
+        onSelect: (item) => this.removeDayExercise(part, item.exercise),
+        emptyMessage: "削除できる種目がありません。",
+      });
+      return;
+    }
+
+    // 追加モード（部位を選んで種目を選ぶ画面）：種目の追加・編集UIも出す
+    this.view.renderExercisePicker(items, {
+      onSelect: (item) => this.addDayExercise(part, item.exercise),
+      onAddExercise: (name) => this.createExercise(part, name),
+      editMode: this.editExercisesMode,
+      onEditToggle: () => {
+        this.editExercisesMode = !this.editExercisesMode;
+        this.renderExercisePicker();
       },
-      "削除できる種目がありません。"
-    );
+      onRename: (p, oldName, newName) => this.renameExercise(p, oldName, newName),
+      onDelete: (p, exercise) => this.deleteExercise(p, exercise),
+    });
+  }
+
+  async createExercise(part, name) {
+    // 成功時は最新の種目一覧で画面を更新する。失敗時はViewのフォーム側でエラー表示させるため再throwする。
+    await this.model.addExercise(part, name);
+    this.renderExercisePicker();
+  }
+
+  async renameExercise(part, oldName, newName) {
+    // 失敗時はViewのフォーム側でエラー表示させるため、ここでは握りつぶさず再throwする。
+    await this.model.renameExercise(part, oldName, newName);
+    this.renderExercisePicker();
+  }
+
+  async deleteExercise(part, exercise) {
+    const ok = await this.view.confirm(`「${exercise}」を削除します。本当に削除してよろしいですか？`);
+    if (!ok) return;
+    await this._runAction(async () => {
+      await this.model.deleteExercise(part, exercise);
+      this.renderExercisePicker();
+    });
   }
 
   // ---------------- 全記録モーダル ----------------
