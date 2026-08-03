@@ -964,10 +964,11 @@ button { font-family: inherit; }
   gap: 2px;
   flex-shrink: 0;
   align-items: flex-end;
-  min-width: 0;
+  /* 記録の有無や桁数に関わらず一定幅を確保し、タイマー領域と分離する */
+  width: 170px;
 }
 
-/* レストタイマー（MAX表示の左隣） */
+/* レストタイマー（MAX表示の左隣・固定幅の独立領域） */
 .hc-timer {
   display: flex;
   flex-direction: column;
@@ -975,6 +976,8 @@ button { font-family: inherit; }
   align-items: center;
   gap: 3px;
   flex-shrink: 0;
+  /* 不使用／設定済み（開始ボタンの有無）で幅が変わっても位置が動かないよう固定 */
+  width: 124px;
 }
 
 .hc-timer-caption {

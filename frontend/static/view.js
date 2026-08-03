@@ -258,15 +258,15 @@ class IronLogView {
         </div>
       `;
 
-      const bestHTML =
+      // MAX表示は記録が無くても領域を確保する（空でもタイマーの位置がずれないように）
+      const bestLinesHTML =
         bestWeight && bestReps
           ? `
-            <div class="hc-best">
               <span class="hc-best-line hc-best-line-max"><span class="hc-best-label">MAX重量</span>${bestWeight.weight}kg ${bestWeight.reps}回</span>
               <span class="hc-best-line"><span class="hc-best-label">MAX回数</span>${bestReps.weight}kg ${bestReps.reps}回</span>
-            </div>
           `
           : "";
+      const bestHTML = `<div class="hc-best">${bestLinesHTML}</div>`;
 
       const timerHTML = `
         <div class="hc-timer" data-timer-exercise="${IronLogView.escapeHTML(exercise)}">
