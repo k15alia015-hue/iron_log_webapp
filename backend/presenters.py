@@ -42,6 +42,14 @@ def _require_date(date_str):
         raise ApiError("dateはYYYY-MM-DD形式で指定してください", 400)
 
 
+def _require_exercise(payload):
+    """payloadから種目名を取り出す。空ならApiErrorを送出する。"""
+    exercise = payload.get("exercise")
+    if not exercise:
+        raise ApiError("exercise は必須です", 400)
+    return exercise
+
+
 def _effective_body_parts():
     """初期マスタとユーザー追加種目を合成した、実際に使う部位・種目一覧。"""
     return merge_body_parts(BODY_PARTS, CustomExercise.all_grouped_by_part())
@@ -244,11 +252,8 @@ def get_exercise_notes():
 
 
 def save_exercise_note(payload):
-    exercise = payload.get("exercise")
+    exercise = _require_exercise(payload)
     note = payload.get("note", "")
-
-    if not exercise:
-        raise ApiError("exercise は必須です", 400)
 
     if note:
         ExerciseNote.upsert(exercise, note)
@@ -267,11 +272,8 @@ def get_exercise_timers():
 
 
 def save_exercise_timer(payload):
-    exercise = payload.get("exercise")
+    exercise = _require_exercise(payload)
     rest_seconds = payload.get("restSeconds")
-
-    if not exercise:
-        raise ApiError("exercise は必須です", 400)
 
     try:
         rest_seconds = int(rest_seconds)

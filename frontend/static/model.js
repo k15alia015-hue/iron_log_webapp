@@ -44,6 +44,25 @@ class IronLogModel {
     return data;
   }
 
+  /** JSON本体付きのリクエスト（POST/PATCH等）を送る共通ヘルパー。payload省略時は本体なし。 */
+  _send(url, method, payload) {
+    const options = { method };
+    if (payload !== undefined) {
+      options.headers = { "Content-Type": "application/json" };
+      options.body = JSON.stringify(payload);
+    }
+    return this._fetchJSON(url, options);
+  }
+
+  /** サーバーが返したセット一覧でキャッシュを更新する（空になった種目はキャッシュから消す）。 */
+  _applySets(exercise, sets) {
+    if (sets && sets.length > 0) {
+      this.allSets[exercise] = sets;
+    } else {
+      delete this.allSets[exercise];
+    }
+  }
+
   // ---------------- 初期読み込み ----------------
 
   async loadAll() {
@@ -158,58 +177,38 @@ class IronLogModel {
   // ---------------- 更新系（サーバーへ反映してからローカルキャッシュも更新） ----------------
 
   async addSet(exercise, weight, reps, dateStr) {
-    const result = await this._fetchJSON("/api/sets", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ exercise, weight, reps, date: dateStr }),
-    });
-    this.allSets[exercise] = result.sets;
+    const result = await this._send("/api/sets", "POST", { exercise, weight, reps, date: dateStr });
+    this._applySets(exercise, result.sets);
     return result;
   }
 
   async deleteSet(exercise, index) {
-    const result = await this._fetchJSON(
+    const result = await this._send(
       `/api/sets/${encodeURIComponent(exercise)}/${index}`,
-      { method: "DELETE" }
+      "DELETE"
     );
-    if (result.sets && result.sets.length > 0) {
-      this.allSets[exercise] = result.sets;
-    } else {
-      delete this.allSets[exercise];
-    }
+    this._applySets(exercise, result.sets);
     return result;
   }
 
   async addDayExercise(dateStr, part, exercise) {
-    const result = await this._fetchJSON("/api/day-exercises", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: dateStr, part, exercise }),
-    });
+    const result = await this._send("/api/day-exercises", "POST", { date: dateStr, part, exercise });
     this.dayExercises[dateStr] = result.list;
     return result;
   }
 
   async removeDayExercise(dateStr, part, exercise) {
-    const result = await this._fetchJSON(
+    const result = await this._send(
       `/api/day-exercises/${encodeURIComponent(dateStr)}/${encodeURIComponent(part)}/${encodeURIComponent(exercise)}`,
-      { method: "DELETE" }
+      "DELETE"
     );
     this.dayExercises[dateStr] = result.list;
-    if (result.sets && result.sets.length > 0) {
-      this.allSets[exercise] = result.sets;
-    } else {
-      delete this.allSets[exercise];
-    }
+    this._applySets(exercise, result.sets);
     return result;
   }
 
   async saveNote(exercise, note) {
-    const result = await this._fetchJSON("/api/exercise-notes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ exercise, note }),
-    });
+    const result = await this._send("/api/exercise-notes", "POST", { exercise, note });
     this.exerciseNotes[exercise] = result.note;
     return result;
   }
@@ -220,11 +219,7 @@ class IronLogModel {
   }
 
   async saveTimer(exercise, restSeconds) {
-    const result = await this._fetchJSON("/api/exercise-timers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ exercise, restSeconds }),
-    });
+    const result = await this._send("/api/exercise-timers", "POST", { exercise, restSeconds });
     if (result.restSeconds > 0) {
       this.exerciseTimers[exercise] = result.restSeconds;
     } else {
@@ -234,23 +229,16 @@ class IronLogModel {
   }
 
   async addExercise(part, exercise) {
-    const result = await this._fetchJSON("/api/exercises", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ part, exercise }),
-    });
+    const result = await this._send("/api/exercises", "POST", { part, exercise });
     this._applyExerciseLists(result);
     return result;
   }
 
   async renameExercise(part, oldName, newName) {
-    const result = await this._fetchJSON(
+    const result = await this._send(
       `/api/exercises/${encodeURIComponent(part)}/${encodeURIComponent(oldName)}`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newName }),
-      }
+      "PATCH",
+      { newName }
     );
     this._applyExerciseLists(result);
     // 履歴・記録・メモの参照名もサーバー側で変わっているため、全体を取り直す
@@ -259,9 +247,9 @@ class IronLogModel {
   }
 
   async deleteExercise(part, exercise) {
-    const result = await this._fetchJSON(
+    const result = await this._send(
       `/api/exercises/${encodeURIComponent(part)}/${encodeURIComponent(exercise)}`,
-      { method: "DELETE" }
+      "DELETE"
     );
     this._applyExerciseLists(result);
     // 紐づく履歴・記録・メモもサーバー側で消えているため、全体を取り直す
